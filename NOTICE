@@ -1,0 +1,5 @@
+codex-weixin is a clean-room independent WeChat bridge for OpenAI Codex.
+
+The project structure and protocol boundaries were informed by the MIT-licensed
+Tencent/openclaw-weixin package and by public documentation in the WeChat/Codex
+bridge ecosystem. Source code from AGPL-licensed projects is not copied.
