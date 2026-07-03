@@ -1,31 +1,33 @@
 # codex-weixin
 
-Independent WeChat bridge for local OpenAI Codex sessions.
+**中文** | [English](./README.en.md)
 
-`codex-weixin` logs in to WeChat through the iLink bot protocol, receives private chat messages with long polling, routes them to local Codex, and sends replies back to WeChat.
+独立的微信到本地 OpenAI Codex 桥接工具。
+
+`codex-weixin` 通过微信 iLink bot 协议扫码登录，长轮询接收微信私聊消息，把消息转交给本机 Codex，再把回复发回微信。
 
 ```text
-WeChat private chat
+微信私聊
   <-> iLink HTTP/JSON
-  <-> codex-weixin local daemon
-  <-> codex app-server, with codex exec fallback
+  <-> codex-weixin 本地 daemon
+  <-> codex app-server，必要时回退到 codex exec
 ```
 
-## Status
+## 当前状态
 
-This is an early independent implementation. It is designed as a small, auditable core rather than a full desktop plugin:
+这是一个早期独立实现，目标是先提供小而可审计的核心能力，而不是完整桌面插件：
 
-- Private chat only
-- Local-first state under `~/.codex-weixin`
-- Codex app-server preferred, `codex exec --json` fallback for fresh turns
-- Pairing and workspace allowlist by default
-- Inbound media architecture and outbound media action protocol are present; full media upload/download hardening will continue to evolve
+- 仅支持私聊
+- 本地状态默认保存在 `~/.codex-weixin`
+- 优先使用 Codex app-server；新会话在 app-server 不可用时可回退到 `codex exec --json`
+- 默认启用微信发送者配对和 workspace allowlist
+- 已有入站媒体、出站动作块和 AES 媒体工具的核心结构；真实端到端媒体链路还需要继续硬化
 
-## Requirements
+## 环境要求
 
 - Node.js `>=22`
 - Git
-- Codex CLI installed and authenticated:
+- 已安装并登录 Codex CLI：
 
 ```bash
 npm install -g @openai/codex
@@ -33,7 +35,7 @@ codex --version
 codex
 ```
 
-## Install From Source
+## 从源码安装
 
 ```bash
 git clone https://github.com/XavierJiezou/codex-weixin.git
@@ -42,44 +44,48 @@ npm install
 npm run build
 ```
 
-Run the built CLI:
+运行构建后的 CLI：
 
 ```bash
 node dist/cli/index.js doctor
 ```
 
-During development you can also use:
+开发时也可以直接运行 TypeScript：
 
 ```bash
 npx tsx src/cli/index.ts doctor
 ```
 
-## Quick Start
+## 快速开始
 
-1. Log in to WeChat:
+1. 微信扫码登录：
 
 ```bash
 npx tsx src/cli/index.ts login
 ```
 
-2. Start the bridge in a project directory:
+2. 在项目目录中启动桥接：
 
 ```bash
 cd /absolute/path/to/project
 npx tsx /absolute/path/to/codex-weixin/src/cli/index.ts serve --cwd /absolute/path/to/project
 ```
 
-3. Send a message to the bot in WeChat.
+3. 在微信里给 bot 发消息。
 
-Unknown senders are not allowed immediately. The bridge replies with a pairing notice. For a trusted personal install you can explicitly allow your sender id:
+未知微信发送者不会被立即允许控制本机 Codex。桥接会返回一条配对提示。个人自用时，可以显式允许你的微信 sender id：
 
 ```bash
 npx tsx src/cli/index.ts access allow <sender-id@im.wechat>
 ```
 
-Then send `/help` in WeChat.
+然后在微信里发送：
 
-## CLI Commands
+```text
+/help
+```
+
+## CLI 命令
 
 ```text
 codex-weixin login [--force]
@@ -93,23 +99,23 @@ codex-weixin access remove <wechat-sender-id>
 codex-weixin send-text --to last|<wechat-sender-id> --message <text>
 ```
 
-## WeChat Commands
+## 微信内命令
 
 ```text
-/help                         show commands
-/status                       show current sender/workspace/thread/backend
-/bind <absolute-path>          bind this chat to an allowed workspace
-/new                          start a fresh Codex thread on next message
-/prompt start                 buffer several WeChat messages
-/prompt done                  submit buffered messages as one Codex turn
-/stop                         interrupt current app-server task when available
+/help                         查看命令
+/status                       查看当前 sender、workspace、thread 和 backend
+/bind <absolute-path>          将当前微信聊天绑定到允许的 workspace
+/new                          下一条消息开始新的 Codex thread
+/prompt start                 开始缓冲多条微信消息
+/prompt done                  将缓冲内容作为一次 Codex turn 提交
+/stop                         在可用时中断当前 app-server 任务
 ```
 
-Normal text goes to the current Codex session.
+普通文本会发送到当前 Codex 会话。
 
-## Action Blocks
+## 动作块
 
-Codex can explicitly request host actions in its final reply:
+Codex 可以在最终回复里显式声明 host action：
 
 ````text
 ```codex-weixin-actions
@@ -125,41 +131,41 @@ Codex can explicitly request host actions in its final reply:
 ```
 ````
 
-Only absolute paths are accepted. Ordinary prose paths are treated as text and are not sent automatically.
+只有绝对路径会被接受。普通回复里提到的路径只会作为文本展示，不会自动发文件。
 
-## Runtime State
+## 运行时状态
 
-Default location:
+默认位置：
 
 ```text
 ~/.codex-weixin/
-  accounts/       WeChat bot tokens
-  config.json     bridge config
-  state.json      sender bindings, context tokens, paired senders
-  inbound/        downloaded WeChat files/images
+  accounts/       微信 bot token
+  config.json     桥接配置
+  state.json      sender 绑定、context token、已配对 sender
+  inbound/        微信入站图片和文件
   logs/
 ```
 
-Do not commit or share this directory.
+不要提交或分享这个目录。
 
-## Security Model
+## 安全模型
 
-`codex-weixin` lets WeChat remotely control a local Codex process. Treat it like remote shell access with guardrails:
+`codex-weixin` 允许微信远程控制本机 Codex。请把它当作带护栏的远程 shell：
 
-- Unknown senders are denied by default.
-- Workspaces must be allowlisted.
-- `/bind` only accepts absolute paths under allowed workspaces.
-- Generated files are sent only through explicit action blocks or local CLI commands.
-- Credentials stay local under `~/.codex-weixin/accounts`.
+- 未知 sender 默认拒绝
+- workspace 必须在 allowlist 内
+- `/bind` 只接受允许 workspace 下的绝对路径
+- 生成文件只有在明确动作块或本地 CLI 命令中才会发送
+- 微信凭证只保存在本机 `~/.codex-weixin/accounts`
 
-Recommended first run:
+推荐首次运行：
 
 ```bash
 codex-weixin serve --cwd /your/project
 codex-weixin access allow <your-wechat-sender-id>
 ```
 
-## Development
+## 开发
 
 ```bash
 npm install
@@ -168,27 +174,26 @@ npm run typecheck
 npm run build
 ```
 
-The test suite covers core behavior:
+测试覆盖：
 
-- pairing and allowlist access
-- explicit action block parsing
+- 配对和 allowlist
+- 显式动作块解析
 - prompt buffering
-- iLink request payloads and stale context classification
-- AES-128-ECB media helpers
-- Codex exec invocation shape
+- iLink 请求 payload 和 stale context 分类
+- AES-128-ECB 媒体工具
+- Codex exec 参数构造
 
-## References
+## 参考
 
-This project is an independent implementation informed by the public WeChat/Codex bridge ecosystem, especially:
+本项目是独立实现，设计时参考了公开的微信/Codex 桥接生态，尤其是：
 
-- `Tencent/openclaw-weixin` for iLink channel shape and MIT-licensed protocol organization
-- `codex-wechat-plugin`, `CodexBridge`, and `CLI-WeChat-Bridge` for Codex app-server oriented design
-- `wechat-acp` and `wechat-ai-bridge` for file ingress and prompt buffering ideas
-- `codex-wechat-connector` and `codex-wechat-handoff` for explicit action blocks and local safety boundaries
+- `Tencent/openclaw-weixin`：iLink channel 形态和 MIT 协议组织方式
+- `codex-wechat-plugin`、`CodexBridge`、`CLI-WeChat-Bridge`：Codex app-server 主路径设计
+- `wechat-acp`、`wechat-ai-bridge`：文件入站和 prompt buffering 思路
+- `codex-wechat-connector`、`codex-wechat-handoff`：显式动作块和本地安全边界
 
-AGPL-licensed project source is not copied.
+没有复制 AGPL 项目源码。
 
 ## License
 
 MIT
-
