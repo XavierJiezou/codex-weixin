@@ -65,20 +65,39 @@ test("normalizes inbound file and video items as attachments", () => {
   ]);
 });
 
-test("normalizes inbound voice text and audio media", () => {
+test("normalizes inbound voice transcription without audio attachment", () => {
   const message = normalizeWeixinMessage({
     message_id: "msg-3",
     from_user_id: "alice@im.wechat",
     item_list: [{
       type: 3,
       voice_item: {
-        text: "语音转文字内容",
+        text: "voice transcript",
         media: { encrypt_query_param: "voice-token", aes_key: "voice-key" }
       }
     }]
   });
 
-  assert.equal(message?.text, "语音转文字内容");
+  assert.equal(message?.text, "voice transcript");
+  assert.deepEqual(message?.attachments.map((attachment) => ({
+    kind: attachment.kind,
+    label: attachment.label
+  })), []);
+});
+
+test("normalizes inbound voice media as audio when transcription is unavailable", () => {
+  const message = normalizeWeixinMessage({
+    message_id: "msg-4",
+    from_user_id: "alice@im.wechat",
+    item_list: [{
+      type: 3,
+      voice_item: {
+        media: { encrypt_query_param: "voice-token", aes_key: "voice-key" }
+      }
+    }]
+  });
+
+  assert.equal(message?.text, "");
   assert.deepEqual(message?.attachments.map((attachment) => ({
     kind: attachment.kind,
     label: attachment.label

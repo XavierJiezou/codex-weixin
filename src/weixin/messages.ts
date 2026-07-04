@@ -58,10 +58,7 @@ export function extractTextItem(item: Record<string, unknown>): string | undefin
     return (textItem as { text: string }).text;
   }
   const voiceItem = item.voice_item;
-  if (voiceItem && typeof voiceItem === "object" && typeof (voiceItem as { text?: unknown }).text === "string") {
-    return (voiceItem as { text: string }).text;
-  }
-  return undefined;
+  return extractVoiceTranscription(voiceItem);
 }
 
 export function extractAttachments(items: Array<Record<string, unknown>>): WeixinInboundAttachment[] {
@@ -73,7 +70,9 @@ export function extractAttachments(items: Array<Record<string, unknown>>): Weixi
       continue;
     }
     if (type === 3 && hasMedia(item.voice_item)) {
-      attachments.push({ kind: "audio", label: "voice.silk", item });
+      if (!extractVoiceTranscription(item.voice_item)) {
+        attachments.push({ kind: "audio", label: "voice.silk", item });
+      }
       continue;
     }
     if (type === 4 && hasMedia(item.file_item)) {
@@ -89,6 +88,17 @@ export function extractAttachments(items: Array<Record<string, unknown>>): Weixi
     }
   }
   return attachments;
+}
+
+function extractVoiceTranscription(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const text = (value as { text?: unknown }).text;
+  if (typeof text !== "string" || !text.trim()) {
+    return undefined;
+  }
+  return text;
 }
 
 function hasMedia(value: unknown): boolean {

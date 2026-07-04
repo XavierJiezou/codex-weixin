@@ -21,7 +21,7 @@ This is an early independent implementation. It is designed as a small, auditabl
 - Local-first state under `~/.codex-weixin`
 - Codex app-server preferred, `codex exec --json` fallback for fresh turns
 - Pairing and workspace allowlist by default
-- Inbound images, files, videos, and voice/audio messages are downloaded to local `inbound/` storage and can be passed to Codex in normal or `/prompt start` buffered turns
+- Inbound images, files, videos, and voice/audio without transcription are downloaded to local `inbound/` storage; WeChat voice with transcription is passed to Codex as text first
 - Native outbound image/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
 - Codex Markdown local image/file links are extracted into send actions so `C:/...` paths are not returned as plain text links
 
@@ -109,7 +109,7 @@ codex-weixin send-text --to last|<wechat-sender-id> --message <text>
 /stop                         interrupt current app-server task when available
 ```
 
-Normal text goes to the current Codex session. Images, files, videos, and voice/audio messages are first downloaded to local `~/.codex-weixin/inbound` storage and then added to the prompt by path; media sent between `/prompt start` and `/prompt done` is buffered too. If a WeChat voice message includes transcription text, both the transcription and the audio file path are passed to Codex.
+Normal text goes to the current Codex session. Images, files, videos, and voice/audio without transcription are first downloaded to local `~/.codex-weixin/inbound` storage and then added to the prompt by path; media sent between `/prompt start` and `/prompt done` is buffered too. If a WeChat voice message includes transcription text, only the transcription is passed to Codex so Codex does not try to decode `.silk` audio.
 
 ## Action Blocks
 
