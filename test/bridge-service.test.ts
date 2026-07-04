@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +9,8 @@ import { BridgeService } from "../src/bridge/service.js";
 import { defaultConfig } from "../src/state/config.js";
 import { resolveStatePaths } from "../src/state/paths.js";
 import { RuntimeStateStore } from "../src/state/runtime-state.js";
+import { encryptAesEcb } from "../src/weixin/media.js";
+import { normalizeWeixinMessage } from "../src/weixin/messages.js";
 
 test("sends local markdown images as native WeChat image messages", async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-bridge-"));
@@ -86,4 +89,102 @@ test("sends local markdown images as native WeChat image messages", async (t) =>
   assert.equal(textReplies.some((reply) => reply.includes("[codex-weixin] File send requested")), false);
   assert.equal(textReplies.some((reply) => reply.includes(markdownPath)), false);
   assert.equal(textReplies.join("\n").includes("如果图片没有直接显示"), false);
+});
+
+test("buffers inbound image attachments and includes local paths in prompt done", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-buffer-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const key = crypto.randomBytes(16);
+  const plaintext = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from("inbound image bytes")
+  ]);
+  const ciphertext = encryptAesEcb(plaintext, key);
+  const aesKeyBase64 = Buffer.from(key.toString("hex"), "utf8").toString("base64");
+
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const config = {
+    ...defaultConfig(tmpDir),
+    allowedSenderIds: ["alice@im.wechat"],
+    codexBackend: "exec" as const
+  };
+  const textReplies: string[] = [];
+  let prompt = "";
+  const service = new BridgeService({
+    config,
+    stateStore,
+    inboundDir: path.join(tmpDir, "inbound"),
+    mediaFetch: async () => new Response(new Uint8Array(ciphertext), { status: 200 }),
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        textReplies.push(input.text);
+        return { messageId: "text-message" };
+      },
+      async getUploadUrl() {
+        throw new Error("not used");
+      },
+      async sendImageMessage() {
+        throw new Error("not used");
+      },
+      async sendFileMessage() {
+        throw new Error("not used");
+      }
+    },
+    runner: {
+      async run(input: { prompt: string }) {
+        prompt = input.prompt;
+        return { raw: "", text: "done" };
+      },
+      async stop() {}
+    }
+  });
+
+  await service.handleMessage({
+    id: "start",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "/prompt start",
+    raw: {}
+  });
+
+  const imageMessage = normalizeWeixinMessage({
+    message_id: "img-1",
+    from_user_id: "alice@im.wechat",
+    context_token: "ctx",
+    item_list: [{
+      type: 2,
+      image_item: {
+        media: {
+          encrypt_query_param: "download-token",
+          aes_key: aesKeyBase64
+        }
+      }
+    }]
+  });
+  assert.ok(imageMessage);
+  await service.handleMessage(imageMessage);
+
+  await service.handleMessage({
+    id: "text-1",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "描述这张图片",
+    raw: {}
+  });
+
+  await service.handleMessage({
+    id: "done",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "/prompt done",
+    raw: {}
+  });
+
+  assert.match(prompt, /WeChat image: image\.png saved to /);
+  assert.match(prompt, /描述这张图片/);
+  const savedPath = prompt.match(/saved to ([^\]]+)/)?.[1];
+  assert.ok(savedPath);
+  assert.deepEqual(fs.readFileSync(savedPath), plaintext);
+  assert.equal(textReplies.filter((reply) => reply === "Buffered. Send /prompt done when ready.").length, 2);
 });

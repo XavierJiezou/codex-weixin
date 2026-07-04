@@ -7,15 +7,18 @@ import { PromptBuffer } from "./prompt-buffer.js";
 import { HybridCodexRunner } from "../codex/runner.js";
 import { isWorkspaceAllowed, type CodexWeixinConfig } from "../state/config.js";
 import { RuntimeStateStore } from "../state/runtime-state.js";
-import { WeixinApiClient, isStaleContextError } from "../weixin/api.js";
-import { sendLocalMediaFile } from "../weixin/media.js";
+import { WeixinApiClient, isStaleContextError, type FetchLike } from "../weixin/api.js";
+import { downloadInboundAttachments, sendLocalMediaFile } from "../weixin/media.js";
 import type { NormalizedWeixinMessage } from "../weixin/messages.js";
+import type { PromptBufferItem } from "./prompt-buffer.js";
 
 export type BridgeServiceOptions = {
   config: CodexWeixinConfig;
   stateStore: RuntimeStateStore;
   weixin: WeixinApiClient;
   runner?: HybridCodexRunner;
+  inboundDir?: string;
+  mediaFetch?: FetchLike;
 };
 
 export class BridgeService {
@@ -57,12 +60,15 @@ export class BridgeService {
     }
 
     if (this.buffers.isActive(message.senderId)) {
-      this.buffers.append(message.senderId, { kind: "text", text: message.text });
+      const items = await this.promptItemsFromMessage(message);
+      for (const item of items) {
+        this.buffers.append(message.senderId, item);
+      }
       await this.reply(message.senderId, "Buffered. Send /prompt done when ready.");
       return;
     }
 
-    await this.runCodexTurn(message, message.text);
+    await this.runCodexTurn(message, "", await this.promptItemsFromMessage(message));
   }
 
   private async handleCommand(message: NormalizedWeixinMessage, command: { name: string; arg: string }): Promise<void> {
@@ -121,19 +127,52 @@ export class BridgeService {
         await this.reply(senderId, "Prompt buffer is empty.");
         return;
       }
-      const text = buildPrompt("", flushed.items);
-      await this.runCodexTurn({ id: "buffer", senderId, text, raw: {} }, text);
+      await this.runCodexTurn({ id: "buffer", senderId, text: "", attachments: [], raw: {} }, "", flushed.items);
       return;
     }
     await this.reply(senderId, "Usage: /prompt start or /prompt done");
   }
 
-  private async runCodexTurn(message: NormalizedWeixinMessage, text: string): Promise<void> {
+  private async promptItemsFromMessage(message: NormalizedWeixinMessage): Promise<PromptBufferItem[]> {
+    const items: PromptBufferItem[] = [];
+    if (message.text.trim()) {
+      items.push({ kind: "text", text: message.text });
+    }
+    const attachments = message.attachments ?? [];
+    if (!attachments.length) {
+      return items;
+    }
+    try {
+      const downloaded = await downloadInboundAttachments({
+        rootDir: this.options.inboundDir ?? path.join(this.options.config.defaultCwd, ".codex-weixin-inbound"),
+        senderId: message.senderId,
+        messageId: message.id,
+        attachments,
+        maxBytes: this.options.config.maxInboundBytes,
+        fetch: this.options.mediaFetch
+      });
+      for (const attachment of downloaded) {
+        items.push({
+          kind: attachment.kind,
+          path: attachment.path,
+          label: attachment.label
+        });
+      }
+    } catch (error) {
+      items.push({
+        kind: "text",
+        text: `[WeChat attachment download failed: ${error instanceof Error ? error.message : String(error)}]`
+      });
+    }
+    return items;
+  }
+
+  private async runCodexTurn(message: NormalizedWeixinMessage, text: string, attachments: PromptBufferItem[] = []): Promise<void> {
     const workspace = this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd;
     const threadId = this.options.stateStore.getThread(message.senderId) || undefined;
     await this.withTyping(message.senderId, async () => {
       const result = await this.runner.run({
-        prompt: buildPrompt(text),
+        prompt: buildPrompt(text, attachments),
         cwd: workspace,
         threadId,
         model: this.options.config.model,

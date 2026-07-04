@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { FetchLike, WeixinApiClient } from "./api.js";
+import type { WeixinInboundAttachment } from "./messages.js";
 
 const DEFAULT_WEIXIN_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 const UPLOAD_MEDIA_TYPE = {
@@ -12,12 +13,18 @@ const UPLOAD_MEDIA_TYPE = {
 
 export function parseAesKey(raw: string): Buffer {
   const trimmed = raw.trim();
-  const normalized = trimmed.replace(/-/g, "+").replace(/_/g, "/");
-  const key = Buffer.from(normalized, "base64");
-  if (key.length !== 16) {
-    throw new Error(`WeChat media AES key must decode to 16 bytes, got ${key.length}`);
+  if (/^[0-9a-fA-F]{32}$/.test(trimmed)) {
+    return Buffer.from(trimmed, "hex");
   }
-  return key;
+  const normalized = trimmed.replace(/-/g, "+").replace(/_/g, "/");
+  const decoded = Buffer.from(normalized, "base64");
+  if (decoded.length === 16) {
+    return decoded;
+  }
+  if (decoded.length === 32 && /^[0-9a-fA-F]{32}$/.test(decoded.toString("ascii"))) {
+    return Buffer.from(decoded.toString("ascii"), "hex");
+  }
+  throw new Error(`WeChat media AES key must decode to 16 bytes, got ${decoded.length}`);
 }
 
 export function encryptAesEcb(plaintext: Buffer, key: Buffer): Buffer {
@@ -53,6 +60,167 @@ export function sanitizeFileName(name: string): string {
 
 export function inferMediaKind(fileName: string): "image" | "file" {
   return /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(fileName) ? "image" : "file";
+}
+
+export type DownloadedInboundAttachment = {
+  kind: "image" | "file" | "video";
+  path: string;
+  label: string;
+};
+
+export async function downloadInboundAttachments(input: {
+  rootDir: string;
+  senderId: string;
+  messageId: string;
+  attachments: WeixinInboundAttachment[];
+  maxBytes: number;
+  fetch?: FetchLike;
+}): Promise<DownloadedInboundAttachment[]> {
+  const downloaded: DownloadedInboundAttachment[] = [];
+  for (const [index, attachment] of input.attachments.entries()) {
+    downloaded.push(await downloadInboundAttachment({
+      rootDir: input.rootDir,
+      senderId: input.senderId,
+      messageId: `${input.messageId}-${index + 1}`,
+      attachment,
+      maxBytes: input.maxBytes,
+      fetch: input.fetch
+    }));
+  }
+  return downloaded;
+}
+
+async function downloadInboundAttachment(input: {
+  rootDir: string;
+  senderId: string;
+  messageId: string;
+  attachment: WeixinInboundAttachment;
+  maxBytes: number;
+  fetch?: FetchLike;
+}): Promise<DownloadedInboundAttachment> {
+  const ref = inboundMediaRef(input.attachment);
+  const encrypted = await downloadMediaBuffer({
+    url: ref.fullUrl ?? downloadUrlFromParam(ref.encryptQueryParam),
+    maxBytes: input.maxBytes,
+    fetch: input.fetch
+  });
+  const key = inboundAesKey(ref);
+  const plaintext = key ? decryptAesEcb(encrypted, key) : encrypted;
+  const label = labelWithExtension(input.attachment.label, input.attachment.kind, plaintext);
+  const targetPath = uniqueInboundPath({
+    rootDir: input.rootDir,
+    senderId: input.senderId,
+    messageId: input.messageId,
+    label
+  });
+  fs.writeFileSync(targetPath, plaintext);
+  return { kind: input.attachment.kind, path: targetPath, label };
+}
+
+function inboundMediaRef(attachment: WeixinInboundAttachment): {
+  encryptQueryParam?: string;
+  aesKey?: string;
+  fullUrl?: string;
+  aeskey?: string;
+} {
+  const containerName = `${attachment.kind}_item` as "image_item" | "file_item" | "video_item";
+  const container = attachment.item[containerName] as {
+    aeskey?: unknown;
+    media?: { encrypt_query_param?: unknown; aes_key?: unknown; full_url?: unknown };
+  } | undefined;
+  const media = container?.media;
+  return {
+    encryptQueryParam: typeof media?.encrypt_query_param === "string" ? media.encrypt_query_param : undefined,
+    aesKey: typeof media?.aes_key === "string" ? media.aes_key : undefined,
+    fullUrl: typeof media?.full_url === "string" ? media.full_url : undefined,
+    aeskey: typeof container?.aeskey === "string" ? container.aeskey : undefined
+  };
+}
+
+function inboundAesKey(ref: { aeskey?: string; aesKey?: string }): Buffer | undefined {
+  if (ref.aeskey) {
+    return Buffer.from(ref.aeskey, "hex");
+  }
+  return ref.aesKey ? parseAesKey(ref.aesKey) : undefined;
+}
+
+async function downloadMediaBuffer(input: {
+  url: string;
+  maxBytes: number;
+  fetch?: FetchLike;
+}): Promise<Buffer> {
+  const response = await (input.fetch ?? globalThis.fetch.bind(globalThis))(input.url);
+  if (!response.ok) {
+    throw new Error(`CDN download failed: ${response.status} ${response.statusText}`);
+  }
+  const contentLength = response.headers.get("content-length");
+  if (contentLength && Number(contentLength) > input.maxBytes) {
+    throw new Error(`Inbound media exceeds max size ${input.maxBytes} bytes`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > input.maxBytes) {
+    throw new Error(`Inbound media exceeds max size ${input.maxBytes} bytes`);
+  }
+  return buffer;
+}
+
+function downloadUrlFromParam(encryptQueryParam?: string): string {
+  if (!encryptQueryParam?.trim()) {
+    throw new Error("Inbound media is missing download URL");
+  }
+  return `${DEFAULT_WEIXIN_CDN_BASE_URL}/download?encrypted_query_param=${encodeURIComponent(encryptQueryParam)}`;
+}
+
+function labelWithExtension(label: string, kind: "image" | "file" | "video", buffer: Buffer): string {
+  const ext = path.extname(label);
+  if (ext) {
+    return sanitizeFileName(label);
+  }
+  if (kind === "image") {
+    return sanitizeFileName(`${label}${inferImageExtension(buffer)}`);
+  }
+  if (kind === "video") {
+    return sanitizeFileName(`${label}.mp4`);
+  }
+  return sanitizeFileName(label);
+}
+
+function inferImageExtension(buffer: Buffer): string {
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return ".png";
+  }
+  if (buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) {
+    return ".jpg";
+  }
+  if (buffer.subarray(0, 6).toString("ascii") === "GIF87a" || buffer.subarray(0, 6).toString("ascii") === "GIF89a") {
+    return ".gif";
+  }
+  if (buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") {
+    return ".webp";
+  }
+  return ".bin";
+}
+
+function uniqueInboundPath(input: {
+  rootDir: string;
+  senderId: string;
+  messageId: string;
+  label: string;
+}): string {
+  const dir = path.join(input.rootDir, sanitizePathSegment(input.senderId));
+  fs.mkdirSync(dir, { recursive: true });
+  const parsed = path.parse(input.label);
+  const stem = sanitizeFileName(`${sanitizePathSegment(input.messageId)}-${parsed.name}`);
+  const ext = parsed.ext || "";
+  let candidate = path.join(dir, `${stem}${ext}`);
+  for (let index = 1; fs.existsSync(candidate); index += 1) {
+    candidate = path.join(dir, `${stem}-${index}${ext}`);
+  }
+  return candidate;
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "_") || "unknown";
 }
 
 export async function sendLocalMediaFile(input: {

@@ -11,6 +11,7 @@ import {
   encryptAesEcb,
   parseAesKey,
   sanitizeFileName,
+  downloadInboundAttachments,
   sendLocalMediaFile
 } from "../src/weixin/media.js";
 
@@ -93,4 +94,48 @@ test("uploads local images to CDN and sends native image messages", async (t) =>
   assert.equal(imageMessage?.encryptQueryParam, "download-param");
   assert.equal(imageMessage?.cipherSize, aesEcbPaddedSize(plaintext.length));
   assert.equal(Buffer.from(String(imageMessage?.aesKeyBase64), "base64").toString("utf8"), uploadRequest?.aesKeyHex);
+});
+
+test("downloads inbound encrypted image attachments to local files", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-inbound-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const key = crypto.randomBytes(16);
+  const plaintext = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from("inbound image bytes")
+  ]);
+  const ciphertext = encryptAesEcb(plaintext, key);
+  const aesKeyBase64 = Buffer.from(key.toString("hex"), "utf8").toString("base64");
+  const urls: string[] = [];
+
+  const attachments = await downloadInboundAttachments({
+    rootDir: tmpDir,
+    senderId: "alice@im.wechat",
+    messageId: "msg-1",
+    attachments: [{
+      kind: "image",
+      label: "image",
+      item: {
+        type: 2,
+        image_item: {
+          media: {
+            encrypt_query_param: "download-token",
+            aes_key: aesKeyBase64
+          }
+        }
+      }
+    }],
+    maxBytes: 1024 * 1024,
+    fetch: async (url) => {
+      urls.push(String(url));
+      return new Response(new Uint8Array(ciphertext), { status: 200 });
+    }
+  });
+
+  assert.equal(urls[0], "https://novac2c.cdn.weixin.qq.com/c2c/download?encrypted_query_param=download-token");
+  assert.equal(attachments.length, 1);
+  assert.equal(attachments[0].kind, "image");
+  assert.equal(attachments[0].label, "image.png");
+  assert.equal(path.extname(attachments[0].path), ".png");
+  assert.deepEqual(fs.readFileSync(attachments[0].path), plaintext);
 });

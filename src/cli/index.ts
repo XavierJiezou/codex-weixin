@@ -100,7 +100,7 @@ async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed:
     baseUrl: account.baseUrl,
     token: account.token
   });
-  const service = new BridgeService({ config, stateStore, weixin: client });
+  const service = new BridgeService({ config, stateStore, weixin: client, inboundDir: paths.inboundDir });
   console.log(`codex-weixin serving account ${account.accountId}`);
   await monitorWeixin({
     client,
@@ -171,4 +171,3 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });
-
