@@ -21,7 +21,8 @@ This is an early independent implementation. It is designed as a small, auditabl
 - Local-first state under `~/.codex-weixin`
 - Codex app-server preferred, `codex exec --json` fallback for fresh turns
 - Pairing and workspace allowlist by default
-- Inbound media architecture and outbound media action protocol are present; full media upload/download hardening will continue to evolve
+- Native outbound image/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
+- Codex Markdown local image/file links are extracted into send actions so `C:/...` paths are not returned as plain text links
 
 ## Requirements
 
@@ -129,6 +130,23 @@ Codex can explicitly request host actions in its final reply:
 
 Only absolute paths are accepted. Ordinary prose paths are treated as text and are not sent automatically.
 
+### Images and Files
+
+When Codex needs to send a local file to the WeChat user, the preferred output is the `codex-weixin-actions` block above. The bridge reads the local file, encrypts it with AES-128-ECB, uploads it to the WeChat CDN, and sends it as a native iLink message:
+
+- `type: "image"` sends a WeChat image
+- `type: "file"` sends a WeChat file
+- paths must be absolute local paths
+
+For compatibility with occasional Codex Markdown output, the bridge also converts local Markdown links like these into native send actions:
+
+```markdown
+![chart.png](C:/Users/me/Downloads/chart.png)
+[report.pdf](C:/Users/me/Downloads/report.pdf)
+```
+
+Remote URLs are not treated as local files.
+
 ## Runtime State
 
 Default location:
@@ -151,7 +169,7 @@ Do not commit or share this directory.
 - Unknown senders are denied by default.
 - Workspaces must be allowlisted.
 - `/bind` only accepts absolute paths under allowed workspaces.
-- Generated files are sent only through explicit action blocks or local CLI commands.
+- Generated files are sent only through explicit action blocks, local absolute Markdown links, or local CLI commands.
 - Credentials stay local under `~/.codex-weixin/accounts`.
 
 Recommended first run:
@@ -173,10 +191,10 @@ npm run build
 The test suite covers core behavior:
 
 - pairing and allowlist access
-- explicit action block parsing
+- explicit action block parsing and local Markdown link extraction
 - prompt buffering
-- iLink request payloads and stale context classification
-- AES-128-ECB media helpers
+- iLink login, polling, message, typing, and stale context behavior
+- AES-128-ECB media helpers and outbound image/file upload delivery
 - Codex exec invocation shape
 
 ## References

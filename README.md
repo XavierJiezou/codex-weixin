@@ -21,7 +21,8 @@
 - 本地状态默认保存在 `~/.codex-weixin`
 - 优先使用 Codex app-server；新会话在 app-server 不可用时可回退到 `codex exec --json`
 - 默认启用微信发送者配对和 workspace allowlist
-- 已有入站媒体、出站动作块和 AES 媒体工具的核心结构；真实端到端媒体链路还需要继续硬化
+- 支持出站图片/文件动作：本地文件会通过 iLink `getuploadurl`、微信 CDN 上传和 `sendmessage` 原生发送
+- 支持从 Codex Markdown 本地图片/文件链接中提取发送动作，避免把 `C:/...` 路径当成普通文本发回微信
 
 ## 环境要求
 
@@ -133,6 +134,23 @@ Codex 可以在最终回复里显式声明 host action：
 
 只有绝对路径会被接受。普通回复里提到的路径只会作为文本展示，不会自动发文件。
 
+### 图片和文件发送
+
+当 Codex 需要把本机文件发给微信用户时，推荐在回复中输出上面的 `codex-weixin-actions` 动作块。桥接会读取本地文件，使用 AES-128-ECB 加密后上传到微信 CDN，再通过 iLink 原生消息发送：
+
+- `type: "image"` 会作为微信图片发送
+- `type: "file"` 会作为微信文件发送
+- 路径必须是本机绝对路径
+
+为了兼容 Codex 偶尔输出的 Markdown，本项目也会识别下面这种本地链接并转成原生发送动作：
+
+```markdown
+![chart.png](C:/Users/me/Downloads/chart.png)
+[report.pdf](C:/Users/me/Downloads/report.pdf)
+```
+
+远程 URL 不会被当成本地文件发送。
+
 ## 运行时状态
 
 默认位置：
@@ -155,7 +173,7 @@ Codex 可以在最终回复里显式声明 host action：
 - 未知 sender 默认拒绝
 - workspace 必须在 allowlist 内
 - `/bind` 只接受允许 workspace 下的绝对路径
-- 生成文件只有在明确动作块或本地 CLI 命令中才会发送
+- 生成文件只有在明确动作块、本地绝对 Markdown 链接或本地 CLI 命令中才会发送
 - 微信凭证只保存在本机 `~/.codex-weixin/accounts`
 
 推荐首次运行：
@@ -177,10 +195,10 @@ npm run build
 测试覆盖：
 
 - 配对和 allowlist
-- 显式动作块解析
+- 显式动作块解析和本地 Markdown 链接提取
 - prompt buffering
-- iLink 请求 payload 和 stale context 分类
-- AES-128-ECB 媒体工具
+- iLink 登录、轮询、发消息、typing 和 stale context 分类
+- AES-128-ECB 媒体工具和出站图片/文件上传发送流程
 - Codex exec 参数构造
 
 ## 参考
