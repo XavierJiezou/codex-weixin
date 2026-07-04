@@ -8,6 +8,7 @@ import { HybridCodexRunner } from "../codex/runner.js";
 import { isWorkspaceAllowed, type CodexWeixinConfig } from "../state/config.js";
 import { RuntimeStateStore } from "../state/runtime-state.js";
 import { WeixinApiClient, isStaleContextError } from "../weixin/api.js";
+import { sendLocalMediaFile } from "../weixin/media.js";
 import type { NormalizedWeixinMessage } from "../weixin/messages.js";
 
 export type BridgeServiceOptions = {
@@ -130,23 +131,66 @@ export class BridgeService {
   private async runCodexTurn(message: NormalizedWeixinMessage, text: string): Promise<void> {
     const workspace = this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd;
     const threadId = this.options.stateStore.getThread(message.senderId) || undefined;
-    await this.options.weixin.sendTyping({ toUserId: message.senderId, contextToken: this.options.stateStore.getContextToken(message.senderId) });
-    const result = await this.runner.run({
-      prompt: buildPrompt(text),
-      cwd: workspace,
-      threadId,
-      model: this.options.config.model,
-      effort: this.options.config.effort
+    await this.withTyping(message.senderId, async () => {
+      const result = await this.runner.run({
+        prompt: buildPrompt(text),
+        cwd: workspace,
+        threadId,
+        model: this.options.config.model,
+        effort: this.options.config.effort
+      });
+      if (result.threadId) {
+        this.options.stateStore.setThread(message.senderId, result.threadId);
+      }
+      const parsed = parseActionBlocks(result.text);
+      if (parsed.visibleText.trim()) {
+        for (const chunk of chunkText(parsed.visibleText)) {
+          await this.reply(message.senderId, chunk);
+        }
+      }
+      for (const action of parsed.actions.send) {
+        await this.sendLocalMedia(message.senderId, action);
+      }
     });
-    if (result.threadId) {
-      this.options.stateStore.setThread(message.senderId, result.threadId);
+  }
+
+  private async sendLocalMedia(senderId: string, action: { type: "image" | "file"; path: string }): Promise<void> {
+    try {
+      await sendLocalMediaFile({
+        client: this.options.weixin,
+        toUserId: senderId,
+        contextToken: this.options.stateStore.getContextToken(senderId),
+        filePath: action.path,
+        kind: action.type
+      });
+    } catch (error) {
+      const label = action.type === "image" ? "image" : "file";
+      await this.reply(senderId, `[codex-weixin] Failed to send ${label}: ${error instanceof Error ? error.message : String(error)}`);
     }
-    const parsed = parseActionBlocks(result.text);
-    for (const chunk of chunkText(parsed.visibleText)) {
-      await this.reply(message.senderId, chunk);
-    }
-    for (const action of parsed.actions.send) {
-      await this.reply(message.senderId, `[codex-weixin] File send requested: ${action.type} ${action.path}\nUse local CLI send commands if this environment lacks fresh media context.`);
+  }
+
+  private async withTyping(senderId: string, run: () => Promise<void>): Promise<void> {
+    const sendTyping = async (typing: boolean) => {
+      try {
+        await this.options.weixin.sendTyping({
+          toUserId: senderId,
+          contextToken: this.options.stateStore.getContextToken(senderId),
+          typing
+        });
+      } catch (error) {
+        console.warn(`WeChat typing indicator failed for ${senderId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+
+    await sendTyping(true);
+    const timer = setInterval(() => {
+      void sendTyping(true);
+    }, 5_000);
+    try {
+      await run();
+    } finally {
+      clearInterval(timer);
+      await sendTyping(false);
     }
   }
 
@@ -197,4 +241,3 @@ function helpText(): string {
     "/stop - interrupt current app-server task"
   ].join("\n");
 }
-

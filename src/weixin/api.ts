@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 export type WeixinApiClientOptions = {
@@ -32,7 +34,10 @@ export class WeixinApiClient {
   }
 
   async getUpdates(syncKey?: string): Promise<unknown> {
-    return this.post("ilink/bot/getupdates", syncKey ? { sync_key: syncKey } : {});
+    return this.post("ilink/bot/getupdates", {
+      get_updates_buf: syncKey ?? "",
+      base_info: { channel_version: "0.1.0" }
+    });
   }
 
   async sendText(input: {
@@ -40,34 +45,61 @@ export class WeixinApiClient {
     text: string;
     contextToken?: string;
   }): Promise<{ messageId: string }> {
+    const clientId = crypto.randomUUID();
     const body = {
-      to_user_id: input.toUserId,
-      ...(input.contextToken ? { context_token: input.contextToken } : {}),
-      item_list: [{ type: 1, text_item: { text: input.text } }]
+      msg: {
+        from_user_id: "",
+        to_user_id: input.toUserId,
+        client_id: clientId,
+        message_type: 2,
+        message_state: 2,
+        ...(input.contextToken ? { context_token: input.contextToken } : {}),
+        item_list: [{ type: 1, text_item: { text: input.text } }]
+      },
+      base_info: { channel_version: "0.1.0" }
     };
     const response = await this.post("ilink/bot/sendmessage", body);
-    return { messageId: String(response.message_id ?? response.msgid ?? "") };
+    return { messageId: String(response.message_id ?? response.msgid ?? clientId) };
   }
 
   async sendTyping(input: { toUserId: string; contextToken?: string; typing?: boolean }): Promise<void> {
+    const config = await this.post("ilink/bot/getconfig", {
+      ilink_user_id: input.toUserId,
+      ...(input.contextToken ? { context_token: input.contextToken } : {}),
+      base_info: { channel_version: "0.1.0" }
+    });
+    const typingTicket = typeof config.typing_ticket === "string" ? config.typing_ticket.trim() : "";
+    if (!typingTicket) {
+      throw new Error("getconfig response missing typing_ticket");
+    }
     await this.post("ilink/bot/sendtyping", {
-      to_user_id: input.toUserId,
-      typing: input.typing ?? true,
-      ...(input.contextToken ? { context_token: input.contextToken } : {})
+      ilink_user_id: input.toUserId,
+      typing_ticket: typingTicket,
+      status: input.typing === false ? 2 : 1,
+      base_info: { channel_version: "0.1.0" }
     });
   }
 
   async getUploadUrl(input: {
+    fileKey: string;
+    mediaType: number;
     toUserId: string;
-    fileName: string;
-    fileSize: number;
-    contextToken?: string;
+    rawSize: number;
+    rawFileMd5: string;
+    cipherSize: number;
+    noNeedThumb?: boolean;
+    aesKeyHex?: string;
   }): Promise<{ uploadParam?: string; uploadFullUrl?: string; fileKey?: string }> {
     const response = await this.post("ilink/bot/getuploadurl", {
+      filekey: input.fileKey,
+      media_type: input.mediaType,
       to_user_id: input.toUserId,
-      file_name: input.fileName,
-      file_size: input.fileSize,
-      ...(input.contextToken ? { context_token: input.contextToken } : {})
+      rawsize: input.rawSize,
+      rawfilemd5: input.rawFileMd5,
+      filesize: input.cipherSize,
+      ...(typeof input.noNeedThumb === "boolean" ? { no_need_thumb: input.noNeedThumb } : {}),
+      ...(input.aesKeyHex ? { aeskey: input.aesKeyHex } : {}),
+      base_info: { channel_version: "0.1.0" }
     });
     return {
       uploadParam: typeof response.upload_param === "string" ? response.upload_param : undefined,
@@ -81,50 +113,68 @@ export class WeixinApiClient {
     fileName: string;
     encryptQueryParam: string;
     aesKeyBase64: string;
-    size: number;
+    plainSize: number;
     contextToken?: string;
   }): Promise<{ messageId: string }> {
+    const clientId = crypto.randomUUID();
     const response = await this.post("ilink/bot/sendmessage", {
-      to_user_id: input.toUserId,
-      ...(input.contextToken ? { context_token: input.contextToken } : {}),
-      item_list: [{
-        type: 6,
-        file_item: {
-          file_name: input.fileName,
-          len: String(input.size),
-          media: {
-            encrypt_query_param: input.encryptQueryParam,
-            aes_key: input.aesKeyBase64
+      msg: {
+        from_user_id: "",
+        to_user_id: input.toUserId,
+        client_id: clientId,
+        message_type: 2,
+        message_state: 2,
+        ...(input.contextToken ? { context_token: input.contextToken } : {}),
+        item_list: [{
+          type: 4,
+          file_item: {
+            media: {
+              encrypt_query_param: input.encryptQueryParam,
+              aes_key: input.aesKeyBase64,
+              encrypt_type: 1
+            },
+            file_name: input.fileName,
+            len: String(input.plainSize)
           }
-        }
-      }]
+        }]
+      },
+      base_info: { channel_version: "0.1.0" }
     });
-    return { messageId: String(response.message_id ?? response.msgid ?? "") };
+    return { messageId: String(response.message_id ?? response.msgid ?? clientId) };
   }
 
   async sendImageMessage(input: {
     toUserId: string;
     encryptQueryParam: string;
     aesKeyBase64: string;
-    size: number;
+    cipherSize: number;
     contextToken?: string;
   }): Promise<{ messageId: string }> {
+    const clientId = crypto.randomUUID();
     const response = await this.post("ilink/bot/sendmessage", {
-      to_user_id: input.toUserId,
-      ...(input.contextToken ? { context_token: input.contextToken } : {}),
-      item_list: [{
-        type: 2,
-        image_item: {
-          media: {
-            encrypt_query_param: input.encryptQueryParam,
-            aes_key: input.aesKeyBase64
-          },
-          mid_size: input.size,
-          hd_size: input.size
-        }
-      }]
+      msg: {
+        from_user_id: "",
+        to_user_id: input.toUserId,
+        client_id: clientId,
+        message_type: 2,
+        message_state: 2,
+        ...(input.contextToken ? { context_token: input.contextToken } : {}),
+        item_list: [{
+          type: 2,
+          image_item: {
+            media: {
+              encrypt_query_param: input.encryptQueryParam,
+              aes_key: input.aesKeyBase64,
+              encrypt_type: 1
+            },
+            mid_size: input.cipherSize,
+            hd_size: input.cipherSize
+          }
+        }]
+      },
+      base_info: { channel_version: "0.1.0" }
     });
-    return { messageId: String(response.message_id ?? response.msgid ?? "") };
+    return { messageId: String(response.message_id ?? response.msgid ?? clientId) };
   }
 
   private async post(endpoint: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -161,4 +211,3 @@ export class WeixinApiClient {
 function shortEndpoint(endpoint: string): string {
   return endpoint.split("/").at(-1) ?? endpoint;
 }
-

@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
-import { decryptAesEcb, encryptAesEcb, parseAesKey, sanitizeFileName } from "../src/weixin/media.js";
+import {
+  aesEcbPaddedSize,
+  decryptAesEcb,
+  encryptAesEcb,
+  parseAesKey,
+  sanitizeFileName,
+  sendLocalMediaFile
+} from "../src/weixin/media.js";
 
 test("encrypts and decrypts WeChat CDN AES-128-ECB payloads", () => {
   const key = crypto.randomBytes(16);
@@ -20,4 +30,67 @@ test("parses base64 aes keys and sanitizes filenames", () => {
 
   assert.deepEqual(parseAesKey(key.toString("base64")), key);
   assert.equal(sanitizeFileName("a/b\\c:?.pdf"), "a_b_c__.pdf");
+});
+
+test("computes AES-ECB padded upload sizes", () => {
+  assert.equal(aesEcbPaddedSize(0), 16);
+  assert.equal(aesEcbPaddedSize(15), 16);
+  assert.equal(aesEcbPaddedSize(16), 32);
+});
+
+test("uploads local images to CDN and sends native image messages", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-media-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const filePath = path.join(tmpDir, "generated_image_latest.png");
+  const plaintext = Buffer.from("png image bytes");
+  fs.writeFileSync(filePath, plaintext);
+
+  let uploadRequest: Record<string, unknown> | undefined;
+  let imageMessage: Record<string, unknown> | undefined;
+  let cdnUpload: { url: string; bodyLength: number } | undefined;
+  const client = {
+    async getUploadUrl(input: Record<string, unknown>) {
+      uploadRequest = input;
+      return { uploadParam: "upload-token" };
+    },
+    async sendImageMessage(input: Record<string, unknown>) {
+      imageMessage = input;
+      return { messageId: "image-message" };
+    },
+    async sendFileMessage() {
+      throw new Error("expected image message");
+    }
+  };
+
+  const result = await sendLocalMediaFile({
+    client,
+    toUserId: "alice@im.wechat",
+    contextToken: "ctx",
+    filePath,
+    kind: "image",
+    fetch: async (url, init) => {
+      const body = init?.body as Uint8Array;
+      cdnUpload = { url: String(url), bodyLength: body.byteLength };
+      return new Response("", {
+        status: 200,
+        headers: { "x-encrypted-query-param": "download-param" }
+      });
+    }
+  });
+
+  assert.deepEqual(result, { messageId: "image-message", kind: "image" });
+  assert.equal(uploadRequest?.mediaType, 1);
+  assert.equal(uploadRequest?.toUserId, "alice@im.wechat");
+  assert.equal(uploadRequest?.rawSize, plaintext.length);
+  assert.equal(uploadRequest?.rawFileMd5, crypto.createHash("md5").update(plaintext).digest("hex"));
+  assert.equal(uploadRequest?.cipherSize, aesEcbPaddedSize(plaintext.length));
+  assert.match(String(uploadRequest?.fileKey), /^[0-9a-f]{32}$/i);
+  assert.match(String(uploadRequest?.aesKeyHex), /^[0-9a-f]{32}$/i);
+  assert.equal(cdnUpload?.url, "https://novac2c.cdn.weixin.qq.com/c2c/upload?encrypted_query_param=upload-token&filekey=" + uploadRequest?.fileKey);
+  assert.equal(cdnUpload?.bodyLength, aesEcbPaddedSize(plaintext.length));
+  assert.equal(imageMessage?.toUserId, "alice@im.wechat");
+  assert.equal(imageMessage?.contextToken, "ctx");
+  assert.equal(imageMessage?.encryptQueryParam, "download-param");
+  assert.equal(imageMessage?.cipherSize, aesEcbPaddedSize(plaintext.length));
+  assert.equal(Buffer.from(String(imageMessage?.aesKeyBase64), "base64").toString("utf8"), uploadRequest?.aesKeyHex);
 });

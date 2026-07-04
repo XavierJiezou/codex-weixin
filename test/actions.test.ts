@@ -33,3 +33,31 @@ test("rejects relative outbound file paths in action blocks", () => {
 
   assert.throws(() => parseActionBlocks(text), /absolute path/i);
 });
+
+test("extracts local markdown image links into native send actions", () => {
+  const text = [
+    "找到了这张，来自下载目录：",
+    "",
+    "![generated_image_latest.png](C:/Users/THU/Downloads/generated_image_latest.png)",
+    "",
+    "如果图片没有直接显示，点这里打开：[generated_image_latest.png](C:/Users/THU/Downloads/generated_image_latest.png)"
+  ].join("\n");
+
+  const parsed = parseActionBlocks(text);
+
+  assert.deepEqual(parsed.actions.send, [
+    { type: "image", path: "C:/Users/THU/Downloads/generated_image_latest.png" }
+  ]);
+  assert.equal(parsed.visibleText.includes("C:/Users/THU/Downloads"), false);
+  assert.equal(parsed.visibleText.includes("如果图片没有直接显示"), false);
+  assert.equal(parsed.visibleText, "找到了这张，来自下载目录：");
+});
+
+test("extracts local markdown file links into native file send actions", () => {
+  const parsed = parseActionBlocks("报告在这里：[report.pdf](C:\\Users\\THU\\Downloads\\report.pdf)");
+
+  assert.deepEqual(parsed.actions.send, [
+    { type: "file", path: "C:\\Users\\THU\\Downloads\\report.pdf" }
+  ]);
+  assert.equal(parsed.visibleText, "");
+});

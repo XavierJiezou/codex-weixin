@@ -14,11 +14,13 @@ export async function monitorWeixin(options: MonitorOptions): Promise<void> {
     const response = await options.client.getUpdates(syncKey) as {
       sync_key?: string;
       next_sync_key?: string;
+      get_updates_buf?: string;
       message_list?: WeixinRawMessage[];
       messages?: WeixinRawMessage[];
+      msgs?: WeixinRawMessage[];
     };
-    syncKey = response.next_sync_key ?? response.sync_key ?? syncKey;
-    const messages = response.message_list ?? response.messages ?? [];
+    syncKey = response.get_updates_buf ?? response.next_sync_key ?? response.sync_key ?? syncKey;
+    const messages = response.msgs ?? response.message_list ?? response.messages ?? [];
     for (const raw of messages) {
       const normalized = normalizeWeixinMessage(raw);
       if (normalized) {
@@ -40,4 +42,3 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
     }, { once: true });
   });
 }
-

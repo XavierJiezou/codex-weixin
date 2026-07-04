@@ -1,7 +1,15 @@
 import type { PromptBufferItem } from "./prompt-buffer.js";
 
+const BRIDGE_ACTION_INSTRUCTIONS = [
+  "WeChat bridge rule: when you need to send a local image or file to the user, do not use Markdown local file links.",
+  "Use a fenced codex-weixin-actions JSON block instead, for example:",
+  "```codex-weixin-actions",
+  "{\"send\":[{\"type\":\"image\",\"path\":\"C:/absolute/path/image.png\"}]}",
+  "```"
+].join("\n");
+
 export function buildPrompt(text: string, attachments: PromptBufferItem[] = []): string {
-  const lines: string[] = [];
+  const lines: string[] = [BRIDGE_ACTION_INSTRUCTIONS];
   if (text.trim()) {
     lines.push(text.trim());
   }
@@ -33,4 +41,3 @@ export function chunkText(text: string, limit = 1800): string[] {
   }
   return chunks.filter(Boolean);
 }
-
