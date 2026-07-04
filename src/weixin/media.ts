@@ -63,7 +63,7 @@ export function inferMediaKind(fileName: string): "image" | "file" {
 }
 
 export type DownloadedInboundAttachment = {
-  kind: "image" | "file" | "video";
+  kind: "image" | "file" | "video" | "audio";
   path: string;
   label: string;
 };
@@ -123,7 +123,7 @@ function inboundMediaRef(attachment: WeixinInboundAttachment): {
   fullUrl?: string;
   aeskey?: string;
 } {
-  const containerName = `${attachment.kind}_item` as "image_item" | "file_item" | "video_item";
+  const containerName = inboundContainerName(attachment.kind);
   const container = attachment.item[containerName] as {
     aeskey?: unknown;
     media?: { encrypt_query_param?: unknown; aes_key?: unknown; full_url?: unknown };
@@ -135,6 +135,10 @@ function inboundMediaRef(attachment: WeixinInboundAttachment): {
     fullUrl: typeof media?.full_url === "string" ? media.full_url : undefined,
     aeskey: typeof container?.aeskey === "string" ? container.aeskey : undefined
   };
+}
+
+function inboundContainerName(kind: WeixinInboundAttachment["kind"]): "image_item" | "file_item" | "video_item" | "voice_item" {
+  return kind === "audio" ? "voice_item" : `${kind}_item` as "image_item" | "file_item" | "video_item";
 }
 
 function inboundAesKey(ref: { aeskey?: string; aesKey?: string }): Buffer | undefined {
@@ -171,7 +175,7 @@ function downloadUrlFromParam(encryptQueryParam?: string): string {
   return `${DEFAULT_WEIXIN_CDN_BASE_URL}/download?encrypted_query_param=${encodeURIComponent(encryptQueryParam)}`;
 }
 
-function labelWithExtension(label: string, kind: "image" | "file" | "video", buffer: Buffer): string {
+function labelWithExtension(label: string, kind: "image" | "file" | "video" | "audio", buffer: Buffer): string {
   const ext = path.extname(label);
   if (ext) {
     return sanitizeFileName(label);
@@ -181,6 +185,9 @@ function labelWithExtension(label: string, kind: "image" | "file" | "video", buf
   }
   if (kind === "video") {
     return sanitizeFileName(`${label}.mp4`);
+  }
+  if (kind === "audio") {
+    return sanitizeFileName(`${label}.silk`);
   }
   return sanitizeFileName(label);
 }

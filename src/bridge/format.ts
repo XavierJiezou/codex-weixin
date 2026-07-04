@@ -2,6 +2,7 @@ import type { PromptBufferItem } from "./prompt-buffer.js";
 
 const BRIDGE_ACTION_INSTRUCTIONS = [
   "WeChat bridge rule: when you need to send a local image or file to the user, do not use Markdown local file links.",
+  "When a WeChat attachment line includes a local path, inspect the saved local attachment with available tools before answering.",
   "Use a fenced codex-weixin-actions JSON block instead, for example:",
   "```codex-weixin-actions",
   "{\"send\":[{\"type\":\"image\",\"path\":\"C:/absolute/path/image.png\"}]}",
@@ -17,7 +18,7 @@ export function buildPrompt(text: string, attachments: PromptBufferItem[] = []):
     if (attachment.kind === "text") {
       lines.push(attachment.text);
     } else {
-      lines.push(`[WeChat ${attachment.kind}: ${attachment.label} saved to ${attachment.path}]`);
+      lines.push(`[WeChat ${attachment.kind}: ${attachment.label} saved to ${attachment.path}]\nInspect the saved local attachment before answering.`);
     }
   }
   return lines.join("\n\n").trim();

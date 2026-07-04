@@ -2,7 +2,8 @@ export type PromptBufferItem =
   | { kind: "text"; text: string }
   | { kind: "file"; path: string; label: string }
   | { kind: "image"; path: string; label: string }
-  | { kind: "video"; path: string; label: string };
+  | { kind: "video"; path: string; label: string }
+  | { kind: "audio"; path: string; label: string };
 
 export type PromptBufferOptions = {
   maxItems: number;

@@ -8,7 +8,7 @@ export type WeixinRawMessage = {
 };
 
 export type WeixinInboundAttachment = {
-  kind: "image" | "file" | "video";
+  kind: "image" | "file" | "video" | "audio";
   label: string;
   item: Record<string, unknown>;
 };
@@ -57,6 +57,10 @@ export function extractTextItem(item: Record<string, unknown>): string | undefin
   if (textItem && typeof textItem === "object" && typeof (textItem as { text?: unknown }).text === "string") {
     return (textItem as { text: string }).text;
   }
+  const voiceItem = item.voice_item;
+  if (voiceItem && typeof voiceItem === "object" && typeof (voiceItem as { text?: unknown }).text === "string") {
+    return (voiceItem as { text: string }).text;
+  }
   return undefined;
 }
 
@@ -66,6 +70,10 @@ export function extractAttachments(items: Array<Record<string, unknown>>): Weixi
     const type = typeof item.type === "number" ? item.type : undefined;
     if (type === 2 && hasMedia(item.image_item)) {
       attachments.push({ kind: "image", label: "image", item });
+      continue;
+    }
+    if (type === 3 && hasMedia(item.voice_item)) {
+      attachments.push({ kind: "audio", label: "voice.silk", item });
       continue;
     }
     if (type === 4 && hasMedia(item.file_item)) {

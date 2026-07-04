@@ -139,3 +139,38 @@ test("downloads inbound encrypted image attachments to local files", async (t) =
   assert.equal(path.extname(attachments[0].path), ".png");
   assert.deepEqual(fs.readFileSync(attachments[0].path), plaintext);
 });
+
+test("downloads inbound encrypted voice attachments to audio files", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-voice-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const key = crypto.randomBytes(16);
+  const plaintext = Buffer.from("silk voice bytes");
+  const ciphertext = encryptAesEcb(plaintext, key);
+  const aesKeyBase64 = Buffer.from(key.toString("hex"), "utf8").toString("base64");
+
+  const attachments = await downloadInboundAttachments({
+    rootDir: tmpDir,
+    senderId: "alice@im.wechat",
+    messageId: "voice-1",
+    attachments: [{
+      kind: "audio",
+      label: "voice.silk",
+      item: {
+        type: 3,
+        voice_item: {
+          media: {
+            encrypt_query_param: "voice-token",
+            aes_key: aesKeyBase64
+          }
+        }
+      }
+    }],
+    maxBytes: 1024 * 1024,
+    fetch: async () => new Response(new Uint8Array(ciphertext), { status: 200 })
+  });
+
+  assert.equal(attachments[0].kind, "audio");
+  assert.equal(attachments[0].label, "voice.silk");
+  assert.equal(path.extname(attachments[0].path), ".silk");
+  assert.deepEqual(fs.readFileSync(attachments[0].path), plaintext);
+});

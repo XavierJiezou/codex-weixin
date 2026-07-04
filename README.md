@@ -21,7 +21,7 @@
 - 本地状态默认保存在 `~/.codex-weixin`
 - 优先使用 Codex app-server；新会话在 app-server 不可用时可回退到 `codex exec --json`
 - 默认启用微信发送者配对和 workspace allowlist
-- 支持入站图片、文件和视频下载到本地 `inbound/`，可在普通消息或 `/prompt start` 缓冲模式中交给 Codex
+- 支持入站图片、文件、视频和语音/音频下载到本地 `inbound/`，可在普通消息或 `/prompt start` 缓冲模式中交给 Codex
 - 支持出站图片/文件动作：本地文件会通过 iLink `getuploadurl`、微信 CDN 上传和 `sendmessage` 原生发送
 - 支持从 Codex Markdown 本地图片/文件链接中提取发送动作，避免把 `C:/...` 路径当成普通文本发回微信
 
@@ -113,7 +113,7 @@ codex-weixin send-text --to last|<wechat-sender-id> --message <text>
 /stop                         在可用时中断当前 app-server 任务
 ```
 
-普通文本会发送到当前 Codex 会话。图片、文件和视频会先下载到本机 `~/.codex-weixin/inbound`，再以本地路径加入 prompt；在 `/prompt start` 和 `/prompt done` 之间发送的媒体也会一起缓冲。
+普通文本会发送到当前 Codex 会话。图片、文件、视频和语音/音频会先下载到本机 `~/.codex-weixin/inbound`，再以本地路径加入 prompt；在 `/prompt start` 和 `/prompt done` 之间发送的媒体也会一起缓冲。微信语音如果带转写文本，会同时把转写文本和音频文件路径交给 Codex。
 
 ## 动作块
 
@@ -199,7 +199,7 @@ npm run build
 - 显式动作块解析和本地 Markdown 链接提取
 - prompt buffering
 - iLink 登录、轮询、发消息、typing 和 stale context 分类
-- AES-128-ECB 媒体工具、入站媒体下载和出站图片/文件上传发送流程
+- AES-128-ECB 媒体工具、入站图片/文件/视频/音频下载和出站图片/文件上传发送流程
 - Codex exec 参数构造
 
 ## 参考

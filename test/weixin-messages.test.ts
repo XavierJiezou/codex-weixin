@@ -64,3 +64,25 @@ test("normalizes inbound file and video items as attachments", () => {
     { kind: "video", label: "video.mp4" }
   ]);
 });
+
+test("normalizes inbound voice text and audio media", () => {
+  const message = normalizeWeixinMessage({
+    message_id: "msg-3",
+    from_user_id: "alice@im.wechat",
+    item_list: [{
+      type: 3,
+      voice_item: {
+        text: "语音转文字内容",
+        media: { encrypt_query_param: "voice-token", aes_key: "voice-key" }
+      }
+    }]
+  });
+
+  assert.equal(message?.text, "语音转文字内容");
+  assert.deepEqual(message?.attachments.map((attachment) => ({
+    kind: attachment.kind,
+    label: attachment.label
+  })), [
+    { kind: "audio", label: "voice.silk" }
+  ]);
+});
