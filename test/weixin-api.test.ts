@@ -216,3 +216,43 @@ test("builds wrapped native file sendmessage requests", async () => {
   }]);
   assert.deepEqual(body.base_info, { channel_version: "0.1.0" });
 });
+
+test("builds wrapped native video sendmessage requests", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const client = new WeixinApiClient({
+    baseUrl: "https://ilink.example/",
+    token: "secret",
+    fetch: async (url, init) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ ret: 0, message_id: "video-message" }), { status: 200 });
+    }
+  });
+
+  const result = await client.sendVideoMessage({
+    toUserId: "alice@im.wechat",
+    contextToken: "ctx",
+    encryptQueryParam: "download-param",
+    aesKeyBase64: "YWVzLWtleQ==",
+    cipherSize: 4096
+  });
+
+  assert.equal(result.messageId, "video-message");
+  const body = JSON.parse(String(calls[0].init.body));
+  assert.equal(body.msg.to_user_id, "alice@im.wechat");
+  assert.equal(body.msg.context_token, "ctx");
+  assert.equal(body.msg.message_type, 2);
+  assert.equal(body.msg.message_state, 2);
+  assert.match(body.msg.client_id, /^[0-9a-f-]{36}$/i);
+  assert.deepEqual(body.msg.item_list, [{
+    type: 5,
+    video_item: {
+      media: {
+        encrypt_query_param: "download-param",
+        aes_key: "YWVzLWtleQ==",
+        encrypt_type: 1
+      },
+      video_size: 4096
+    }
+  }]);
+  assert.deepEqual(body.base_info, { channel_version: "0.1.0" });
+});

@@ -22,8 +22,8 @@ This is an early independent implementation. It is designed as a small, auditabl
 - Codex app-server preferred, `codex exec --json` fallback for fresh turns
 - Pairing and workspace allowlist by default
 - Inbound images, files, videos, and voice/audio without transcription are downloaded to local `inbound/` storage; WeChat voice with transcription is passed to Codex as text first
-- Native outbound image/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
-- Codex Markdown local image/file links are extracted into send actions so `C:/...` paths are not returned as plain text links
+- Native outbound image/video/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
+- Codex Markdown local image/video/file links are extracted into send actions so `C:/...` paths are not returned as plain text links
 
 ## Requirements
 
@@ -120,6 +120,7 @@ Codex can explicitly request host actions in its final reply:
 {
   "send": [
     { "type": "image", "path": "/absolute/path/chart.png" },
+    { "type": "video", "path": "/absolute/path/demo.mp4" },
     { "type": "file", "path": "/absolute/path/report.pdf" }
   ],
   "control": [
@@ -131,11 +132,12 @@ Codex can explicitly request host actions in its final reply:
 
 Only absolute paths are accepted. Ordinary prose paths are treated as text and are not sent automatically.
 
-### Images and Files
+### Images, Videos, and Files
 
 When Codex needs to send a local file to the WeChat user, the preferred output is the `codex-weixin-actions` block above. The bridge reads the local file, encrypts it with AES-128-ECB, uploads it to the WeChat CDN, and sends it as a native iLink message:
 
 - `type: "image"` sends a WeChat image
+- `type: "video"` sends a WeChat video
 - `type: "file"` sends a WeChat file
 - paths must be absolute local paths
 
@@ -143,6 +145,7 @@ For compatibility with occasional Codex Markdown output, the bridge also convert
 
 ```markdown
 ![chart.png](C:/Users/me/Downloads/chart.png)
+[demo.mp4](C:/Users/me/Desktop/demo.mp4)
 [report.pdf](C:/Users/me/Downloads/report.pdf)
 ```
 
@@ -195,7 +198,7 @@ The test suite covers core behavior:
 - explicit action block parsing and local Markdown link extraction
 - prompt buffering
 - iLink login, polling, message, typing, and stale context behavior
-- AES-128-ECB media helpers, inbound image/file/video/audio download, and outbound image/file upload delivery
+- AES-128-ECB media helpers, inbound image/file/video/audio download, and outbound image/video/file upload delivery
 - Codex exec invocation shape
 
 ## References

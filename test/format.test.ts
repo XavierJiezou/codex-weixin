@@ -3,16 +3,17 @@ import test from "node:test";
 
 import { buildPrompt } from "../src/bridge/format.js";
 
-test("prompt asks Codex to use native send actions for local files", () => {
-  const prompt = buildPrompt("从电脑里面找一张图片发给我");
+test("prompt asks Codex to use native send actions for local media", () => {
+  const prompt = buildPrompt("send me a random video from desktop");
 
   assert.match(prompt, /codex-weixin-actions/);
   assert.match(prompt, /do not use Markdown local file links/i);
-  assert.match(prompt, /从电脑里面找一张图片发给我/);
+  assert.match(prompt, /video/i);
+  assert.match(prompt, /send me a random video from desktop/);
 });
 
 test("prompt tells Codex to inspect inbound attachment paths", () => {
-  const prompt = buildPrompt("分析这个语音", [{
+  const prompt = buildPrompt("analyze this voice", [{
     kind: "audio",
     label: "voice.silk",
     path: "C:/Users/THU/.codex-weixin/inbound/voice.silk"

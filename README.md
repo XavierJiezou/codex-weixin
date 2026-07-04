@@ -22,8 +22,8 @@
 - 优先使用 Codex app-server；新会话在 app-server 不可用时可回退到 `codex exec --json`
 - 默认启用微信发送者配对和 workspace allowlist
 - 支持入站图片、文件、视频和无转写语音/音频下载到本地 `inbound/`；带转写的微信语音会优先按文本交给 Codex
-- 支持出站图片/文件动作：本地文件会通过 iLink `getuploadurl`、微信 CDN 上传和 `sendmessage` 原生发送
-- 支持从 Codex Markdown 本地图片/文件链接中提取发送动作，避免把 `C:/...` 路径当成普通文本发回微信
+- 支持出站图片/视频/文件动作：本地文件会通过 iLink `getuploadurl`、微信 CDN 上传和 `sendmessage` 原生发送
+- 支持从 Codex Markdown 本地图片/视频/文件链接中提取发送动作，避免把 `C:/...` 路径当成普通文本发回微信
 
 ## 环境要求
 
@@ -124,6 +124,7 @@ Codex 可以在最终回复里显式声明 host action：
 {
   "send": [
     { "type": "image", "path": "/absolute/path/chart.png" },
+    { "type": "video", "path": "/absolute/path/demo.mp4" },
     { "type": "file", "path": "/absolute/path/report.pdf" }
   ],
   "control": [
@@ -135,11 +136,12 @@ Codex 可以在最终回复里显式声明 host action：
 
 只有绝对路径会被接受。普通回复里提到的路径只会作为文本展示，不会自动发文件。
 
-### 图片和文件发送
+### 图片、视频和文件发送
 
 当 Codex 需要把本机文件发给微信用户时，推荐在回复中输出上面的 `codex-weixin-actions` 动作块。桥接会读取本地文件，使用 AES-128-ECB 加密后上传到微信 CDN，再通过 iLink 原生消息发送：
 
 - `type: "image"` 会作为微信图片发送
+- `type: "video"` 会作为微信视频发送
 - `type: "file"` 会作为微信文件发送
 - 路径必须是本机绝对路径
 
@@ -147,6 +149,7 @@ Codex 可以在最终回复里显式声明 host action：
 
 ```markdown
 ![chart.png](C:/Users/me/Downloads/chart.png)
+[demo.mp4](C:/Users/me/Desktop/demo.mp4)
 [report.pdf](C:/Users/me/Downloads/report.pdf)
 ```
 
@@ -199,7 +202,7 @@ npm run build
 - 显式动作块解析和本地 Markdown 链接提取
 - prompt buffering
 - iLink 登录、轮询、发消息、typing 和 stale context 分类
-- AES-128-ECB 媒体工具、入站图片/文件/视频/音频下载和出站图片/文件上传发送流程
+- AES-128-ECB 媒体工具、入站图片/文件/视频/音频下载和出站图片/视频/文件上传发送流程
 - Codex exec 参数构造
 
 ## 参考

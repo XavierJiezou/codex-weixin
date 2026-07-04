@@ -193,7 +193,7 @@ export class BridgeService {
     });
   }
 
-  private async sendLocalMedia(senderId: string, action: { type: "image" | "file"; path: string }): Promise<void> {
+  private async sendLocalMedia(senderId: string, action: { type: "image" | "file" | "video"; path: string }): Promise<void> {
     try {
       await sendLocalMediaFile({
         client: this.options.weixin,
@@ -203,8 +203,7 @@ export class BridgeService {
         kind: action.type
       });
     } catch (error) {
-      const label = action.type === "image" ? "image" : "file";
-      await this.reply(senderId, `[codex-weixin] Failed to send ${label}: ${error instanceof Error ? error.message : String(error)}`);
+      await this.reply(senderId, `[codex-weixin] Failed to send ${action.type}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

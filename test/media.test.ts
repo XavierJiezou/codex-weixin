@@ -96,6 +96,55 @@ test("uploads local images to CDN and sends native image messages", async (t) =>
   assert.equal(Buffer.from(String(imageMessage?.aesKeyBase64), "base64").toString("utf8"), uploadRequest?.aesKeyHex);
 });
 
+test("uploads local videos to CDN and sends native video messages", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-video-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const filePath = path.join(tmpDir, "desktop-demo.mp4");
+  const plaintext = Buffer.from("mp4 video bytes");
+  fs.writeFileSync(filePath, plaintext);
+
+  let uploadRequest: Record<string, unknown> | undefined;
+  let videoMessage: Record<string, unknown> | undefined;
+  const client = {
+    async getUploadUrl(input: Record<string, unknown>) {
+      uploadRequest = input;
+      return { uploadParam: "upload-token" };
+    },
+    async sendImageMessage() {
+      throw new Error("expected video message");
+    },
+    async sendFileMessage() {
+      throw new Error("expected video message");
+    },
+    async sendVideoMessage(input: Record<string, unknown>) {
+      videoMessage = input;
+      return { messageId: "video-message" };
+    }
+  };
+
+  const result = await sendLocalMediaFile({
+    client,
+    toUserId: "alice@im.wechat",
+    contextToken: "ctx",
+    filePath,
+    kind: "video",
+    fetch: async () => new Response("", {
+      status: 200,
+      headers: { "x-encrypted-query-param": "download-param" }
+    })
+  });
+
+  assert.deepEqual(result, { messageId: "video-message", kind: "video" });
+  assert.equal(uploadRequest?.mediaType, 2);
+  assert.equal(uploadRequest?.toUserId, "alice@im.wechat");
+  assert.equal(uploadRequest?.rawSize, plaintext.length);
+  assert.equal(uploadRequest?.cipherSize, aesEcbPaddedSize(plaintext.length));
+  assert.equal(videoMessage?.toUserId, "alice@im.wechat");
+  assert.equal(videoMessage?.contextToken, "ctx");
+  assert.equal(videoMessage?.encryptQueryParam, "download-param");
+  assert.equal(videoMessage?.cipherSize, aesEcbPaddedSize(plaintext.length));
+});
+
 test("downloads inbound encrypted image attachments to local files", async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-inbound-"));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));

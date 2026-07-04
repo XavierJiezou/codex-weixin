@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { inferMediaKind } from "../weixin/media.js";
 
 export type SendAction = {
-  type: "image" | "file";
+  type: "image" | "file" | "video";
   path: string;
 };
 
@@ -41,8 +41,8 @@ function normalizeSendAction(raw: unknown): SendAction {
     throw new Error("send action must be an object");
   }
   const candidate = raw as Partial<SendAction>;
-  if (candidate.type !== "image" && candidate.type !== "file") {
-    throw new Error("send action type must be image or file");
+  if (candidate.type !== "image" && candidate.type !== "file" && candidate.type !== "video") {
+    throw new Error("send action type must be image, file, or video");
   }
   if (typeof candidate.path !== "string" || !candidate.path.trim()) {
     throw new Error("send action path is required");

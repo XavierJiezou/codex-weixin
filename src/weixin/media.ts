@@ -8,6 +8,7 @@ import type { WeixinInboundAttachment } from "./messages.js";
 const DEFAULT_WEIXIN_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 const UPLOAD_MEDIA_TYPE = {
   image: 1,
+  video: 2,
   file: 3
 } as const;
 
@@ -58,8 +59,14 @@ export function sanitizeFileName(name: string): string {
   return cleaned || "attachment";
 }
 
-export function inferMediaKind(fileName: string): "image" | "file" {
-  return /\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(fileName) ? "image" : "file";
+export function inferMediaKind(fileName: string): "image" | "file" | "video" {
+  if (/\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(fileName)) {
+    return "image";
+  }
+  if (/\.(mp4|mov|webm|mkv|avi|m4v)$/i.test(fileName)) {
+    return "video";
+  }
+  return "file";
 }
 
 export type DownloadedInboundAttachment = {
@@ -231,13 +238,13 @@ function sanitizePathSegment(value: string): string {
 }
 
 export async function sendLocalMediaFile(input: {
-  client: Pick<WeixinApiClient, "getUploadUrl" | "sendFileMessage" | "sendImageMessage">;
+  client: Pick<WeixinApiClient, "getUploadUrl" | "sendFileMessage" | "sendImageMessage" | "sendVideoMessage">;
   toUserId: string;
   contextToken?: string;
   filePath: string;
-  kind?: "image" | "file";
+  kind?: "image" | "file" | "video";
   fetch?: FetchLike;
-}): Promise<{ messageId: string; kind: "image" | "file" }> {
+}): Promise<{ messageId: string; kind: "image" | "file" | "video" }> {
   const plaintext = fs.readFileSync(input.filePath);
   const rawSize = plaintext.length;
   const rawFileMd5 = crypto.createHash("md5").update(plaintext).digest("hex");
@@ -270,6 +277,17 @@ export async function sendLocalMediaFile(input: {
 
   if (kind === "image") {
     const result = await input.client.sendImageMessage({
+      toUserId: input.toUserId,
+      contextToken: input.contextToken,
+      encryptQueryParam,
+      aesKeyBase64,
+      cipherSize
+    });
+    return { messageId: result.messageId, kind };
+  }
+
+  if (kind === "video") {
+    const result = await input.client.sendVideoMessage({
       toUserId: input.toUserId,
       contextToken: input.contextToken,
       encryptQueryParam,

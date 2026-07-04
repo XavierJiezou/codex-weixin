@@ -61,3 +61,27 @@ test("extracts local markdown file links into native file send actions", () => {
   ]);
   assert.equal(parsed.visibleText, "");
 });
+
+test("parses explicit video send actions", () => {
+  const text = [
+    "```codex-weixin-actions",
+    JSON.stringify({ send: [{ type: "video", path: "C:/Users/THU/Desktop/demo.mp4" }] }),
+    "```"
+  ].join("\n");
+
+  const parsed = parseActionBlocks(text);
+
+  assert.deepEqual(parsed.actions.send, [
+    { type: "video", path: "C:/Users/THU/Desktop/demo.mp4" }
+  ]);
+  assert.equal(parsed.visibleText, "");
+});
+
+test("extracts local markdown video links into native video send actions", () => {
+  const parsed = parseActionBlocks("Random desktop video: [demo.mp4](C:/Users/THU/Desktop/demo.mp4)");
+
+  assert.deepEqual(parsed.actions.send, [
+    { type: "video", path: "C:/Users/THU/Desktop/demo.mp4" }
+  ]);
+  assert.equal(parsed.visibleText, "");
+});

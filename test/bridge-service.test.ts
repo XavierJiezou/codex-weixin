@@ -91,6 +91,80 @@ test("sends local markdown images as native WeChat image messages", async (t) =>
   assert.equal(textReplies.join("\n").includes("如果图片没有直接显示"), false);
 });
 
+test("sends local markdown videos as native WeChat video messages", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-bridge-video-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const videoPath = path.join(tmpDir, "desktop-demo.mp4");
+  fs.writeFileSync(videoPath, Buffer.from("mp4 video bytes"));
+  const markdownPath = videoPath.replace(/\\/g, "/");
+
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const config = {
+    ...defaultConfig(tmpDir),
+    allowedSenderIds: ["alice@im.wechat"],
+    codexBackend: "exec" as const
+  };
+  const textReplies: string[] = [];
+  const videoMessages: Array<Record<string, unknown>> = [];
+  const weixin = {
+    async sendTyping() {},
+    async sendText(input: { text: string }) {
+      textReplies.push(input.text);
+      return { messageId: "text-message" };
+    },
+    async getUploadUrl() {
+      return { uploadParam: "upload-token" };
+    },
+    async sendImageMessage() {
+      throw new Error("expected video message");
+    },
+    async sendFileMessage() {
+      throw new Error("expected video message");
+    },
+    async sendVideoMessage(input: Record<string, unknown>) {
+      videoMessages.push(input);
+      return { messageId: "video-message" };
+    }
+  };
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("", {
+    status: 200,
+    headers: { "x-encrypted-param": "download-param" }
+  });
+  t.after(() => {
+    globalThis.fetch = previousFetch;
+  });
+
+  const service = new BridgeService({
+    config,
+    stateStore,
+    weixin,
+    runner: {
+      async run() {
+        return {
+          raw: "",
+          text: `Random desktop video: [desktop-demo.mp4](${markdownPath})`
+        };
+      },
+      async stop() {}
+    }
+  });
+
+  await service.handleMessage({
+    id: "message-1",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "send me a random video from desktop",
+    raw: {}
+  });
+
+  assert.equal(videoMessages.length, 1);
+  assert.equal(videoMessages[0].toUserId, "alice@im.wechat");
+  assert.equal(videoMessages[0].contextToken, "ctx");
+  assert.equal(videoMessages[0].encryptQueryParam, "download-param");
+  assert.equal(textReplies.some((reply) => reply.includes(markdownPath)), false);
+});
+
 test("buffers inbound image attachments and includes local paths in prompt done", async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-buffer-"));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
