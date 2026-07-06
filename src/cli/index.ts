@@ -114,7 +114,7 @@ async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed:
         try {
           await client.sendText({
             toUserId: message.senderId,
-            text: `[codex-weixin] message handling failed: ${error instanceof Error ? error.message : String(error)}`,
+            text: userFacingMessageHandlingError(error),
             contextToken: stateStore.getContextToken(message.senderId)
           });
         } catch (replyError) {
@@ -123,6 +123,14 @@ async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed:
       }
     }
   });
+}
+
+function userFacingMessageHandlingError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/timed out|timeout/i.test(message)) {
+    return "[codex-weixin] 本轮任务执行时间过长，已停止处理。请把需求拆成更小步骤后重试。";
+  }
+  return "[codex-weixin] 本轮消息处理失败，详细错误已写入本机日志。";
 }
 
 function commandAccess(paths: ReturnType<typeof resolveStatePaths>, positionals: string[]): void {
