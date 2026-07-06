@@ -9,6 +9,7 @@ export type CodexWeixinConfig = {
   allowedWorkspaces: string[];
   codexBin: string;
   codexBackend: "auto" | "app-server" | "exec";
+  codexExecSandbox: "read-only" | "workspace-write" | "danger-full-access";
   model?: string;
   effort?: string;
   maxBufferItems: number;
@@ -23,6 +24,7 @@ export function defaultConfig(cwd = process.cwd()): CodexWeixinConfig {
     allowedWorkspaces: [path.resolve(cwd)],
     codexBin: "codex",
     codexBackend: "auto",
+    codexExecSandbox: "danger-full-access",
     maxBufferItems: 50,
     promptBufferTtlMs: 10 * 60_000,
     maxInboundBytes: 50 * 1024 * 1024

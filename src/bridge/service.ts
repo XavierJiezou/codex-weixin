@@ -37,7 +37,8 @@ export class BridgeService {
     });
     this.runner = options.runner ?? new HybridCodexRunner({
       backend: options.config.codexBackend,
-      codexBin: options.config.codexBin
+      codexBin: options.config.codexBin,
+      execSandbox: options.config.codexExecSandbox
     });
   }
 
@@ -171,6 +172,7 @@ export class BridgeService {
     const workspace = this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd;
     const threadId = this.options.stateStore.getThread(message.senderId) || undefined;
     await this.withTyping(message.senderId, async () => {
+      console.log(`[codex-weixin] starting Codex turn for ${message.senderId} in ${workspace}`);
       const result = await this.runner.run({
         prompt: buildPrompt(text, attachments),
         cwd: workspace,
@@ -178,6 +180,7 @@ export class BridgeService {
         model: this.options.config.model,
         effort: this.options.config.effort
       });
+      console.log(`[codex-weixin] Codex turn completed for ${message.senderId}; text=${result.text.length} chars`);
       if (result.threadId) {
         this.options.stateStore.setThread(message.senderId, result.threadId);
       }
@@ -239,6 +242,7 @@ export class BridgeService {
       `workspace: ${this.options.stateStore.getWorkspace(senderId) ?? this.options.config.defaultCwd}`,
       `thread: ${this.options.stateStore.getThread(senderId) || "(new)"}`,
       `backend: ${this.options.config.codexBackend}`,
+      `exec sandbox: ${this.options.config.codexExecSandbox}`,
       `model: ${this.options.config.model ?? "(default)"}`,
       `effort: ${this.options.config.effort ?? "(default)"}`
     ].join("\n");
@@ -247,7 +251,9 @@ export class BridgeService {
   private async reply(senderId: string, text: string): Promise<void> {
     const contextToken = this.options.stateStore.getContextToken(senderId);
     try {
+      console.log(`[codex-weixin] sending reply to ${senderId}; text=${text.length} chars`);
       await this.options.weixin.sendText({ toUserId: senderId, text, contextToken });
+      console.log(`[codex-weixin] sent reply to ${senderId}`);
     } catch (error) {
       if (isStaleContextError(error)) {
         console.warn(`WeChat context token is stale for ${senderId}; ask user to send a fresh message.`);

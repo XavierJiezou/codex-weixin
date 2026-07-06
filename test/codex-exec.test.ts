@@ -10,8 +10,13 @@ test("builds codex exec arguments for fresh and resumed sessions", () => {
   );
 
   assert.deepEqual(
-    buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", threadId: "abc" }),
-    ["exec", "resume", "--skip-git-repo-check", "--json", "abc", "hello"]
+    buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", sandbox: "danger-full-access" }),
+    ["exec", "--skip-git-repo-check", "--sandbox", "danger-full-access", "--json", "hello"]
+  );
+
+  assert.deepEqual(
+    buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", threadId: "abc", sandbox: "danger-full-access" }),
+    ["exec", "--skip-git-repo-check", "--sandbox", "danger-full-access", "--json", "resume", "abc", "hello"]
   );
 });
 

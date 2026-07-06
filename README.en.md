@@ -20,6 +20,7 @@ This is an early independent implementation. It is designed as a small, auditabl
 - Private chat only
 - Local-first state under `~/.codex-weixin`
 - Codex app-server preferred, `codex exec --json` fallback for fresh turns
+- `codex exec` uses `--sandbox danger-full-access` by default to avoid local command launch failures from the default sandbox in Windows background daemons; set `codexExecSandbox` in `config.json` to `workspace-write` or `read-only` for a stricter mode
 - Pairing and workspace allowlist by default
 - Inbound images, files, videos, and voice/audio without transcription are downloaded to local `inbound/` storage; WeChat voice with transcription is passed to Codex as text first
 - Native outbound image/video/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
@@ -166,6 +167,18 @@ Default location:
 
 Do not commit or share this directory.
 
+Common Codex fields in `config.json`:
+
+```json
+{
+  "codexBin": "codex",
+  "codexBackend": "auto",
+  "codexExecSandbox": "danger-full-access"
+}
+```
+
+`codexExecSandbox` only affects `codex exec` calls when `codexBackend` is `exec` or when `auto` falls back to `exec`. Valid values are `read-only`, `workspace-write`, and `danger-full-access`.
+
 ## Security Model
 
 `codex-weixin` lets WeChat remotely control a local Codex process. Treat it like remote shell access with guardrails:
@@ -175,6 +188,7 @@ Do not commit or share this directory.
 - `/bind` only accepts absolute paths under allowed workspaces.
 - Generated files are sent only through explicit action blocks, local absolute Markdown links, or local CLI commands.
 - Credentials stay local under `~/.codex-weixin/accounts`.
+- The default `codexExecSandbox` is `danger-full-access` because remote WeChat control of local Codex is already a guarded remote shell. If you only need limited file access, change it to a stricter sandbox in `config.json`.
 
 Recommended first run:
 

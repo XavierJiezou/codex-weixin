@@ -20,6 +20,7 @@
 - 仅支持私聊
 - 本地状态默认保存在 `~/.codex-weixin`
 - 优先使用 Codex app-server；新会话在 app-server 不可用时可回退到 `codex exec --json`
+- `codex exec` 默认使用 `--sandbox danger-full-access`，避免 Windows 后台 daemon 中默认 sandbox 启动本地命令失败；可在 `config.json` 中通过 `codexExecSandbox` 改成 `workspace-write` 或 `read-only`
 - 默认启用微信发送者配对和 workspace allowlist
 - 支持入站图片、文件、视频和无转写语音/音频下载到本地 `inbound/`；带转写的微信语音会优先按文本交给 Codex
 - 支持出站图片/视频/文件动作：本地文件会通过 iLink `getuploadurl`、微信 CDN 上传和 `sendmessage` 原生发送
@@ -170,6 +171,18 @@ Codex 可以在最终回复里显式声明 host action：
 
 不要提交或分享这个目录。
 
+`config.json` 中常用 Codex 字段：
+
+```json
+{
+  "codexBin": "codex",
+  "codexBackend": "auto",
+  "codexExecSandbox": "danger-full-access"
+}
+```
+
+`codexExecSandbox` 只影响 `codexBackend` 为 `exec` 或 `auto` 回退到 `exec` 时的 `codex exec` 调用。可选值为 `read-only`、`workspace-write`、`danger-full-access`。
+
 ## 安全模型
 
 `codex-weixin` 允许微信远程控制本机 Codex。请把它当作带护栏的远程 shell：
@@ -179,6 +192,7 @@ Codex 可以在最终回复里显式声明 host action：
 - `/bind` 只接受允许 workspace 下的绝对路径
 - 生成文件只有在明确动作块、本地绝对 Markdown 链接或本地 CLI 命令中才会发送
 - 微信凭证只保存在本机 `~/.codex-weixin/accounts`
+- 默认 `codexExecSandbox` 为 `danger-full-access`，因为微信远程控制本机 Codex 本身等价于带护栏的远程 shell；如果只需要有限文件访问，请在 `config.json` 中改成更严格的 sandbox
 
 推荐首次运行：
 

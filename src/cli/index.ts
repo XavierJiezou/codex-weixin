@@ -85,6 +85,7 @@ function commandDoctor(paths: ReturnType<typeof resolveStatePaths>): void {
   console.log(`default cwd: ${config.defaultCwd}`);
   console.log(`codex bin: ${config.codexBin}`);
   console.log(`backend: ${config.codexBackend}`);
+  console.log(`exec sandbox: ${config.codexExecSandbox}`);
 }
 
 async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed: ReturnType<typeof parseArgs>): Promise<void> {
@@ -104,7 +105,23 @@ async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed:
   console.log(`codex-weixin serving account ${account.accountId}`);
   await monitorWeixin({
     client,
-    onMessage: (message) => service.handleMessage(message)
+    onMessage: async (message) => {
+      try {
+        await service.handleMessage(message);
+      } catch (error) {
+        const detail = error instanceof Error ? error.stack ?? error.message : String(error);
+        console.error(`[codex-weixin] message handling failed for ${message.senderId}: ${detail}`);
+        try {
+          await client.sendText({
+            toUserId: message.senderId,
+            text: `[codex-weixin] message handling failed: ${error instanceof Error ? error.message : String(error)}`,
+            contextToken: stateStore.getContextToken(message.senderId)
+          });
+        } catch (replyError) {
+          console.error(`[codex-weixin] failed to report error to ${message.senderId}: ${replyError instanceof Error ? replyError.message : String(replyError)}`);
+        }
+      }
+    }
   });
 }
 

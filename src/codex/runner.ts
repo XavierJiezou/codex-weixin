@@ -6,6 +6,7 @@ export type CodexBackend = "auto" | "app-server" | "exec";
 export type HybridCodexRunnerOptions = {
   backend: CodexBackend;
   codexBin?: string;
+  execSandbox?: "read-only" | "workspace-write" | "danger-full-access";
   timeoutMs?: number;
 };
 
@@ -20,6 +21,7 @@ export class HybridCodexRunner {
     });
     this.exec = new CodexExecRunner({
       codexBin: options.codexBin,
+      sandbox: options.execSandbox,
       timeoutMs: options.timeoutMs
     });
   }

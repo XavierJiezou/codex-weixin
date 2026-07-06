@@ -6,17 +6,24 @@ export type BuildCodexExecArgsInput = {
   prompt: string;
   cwd: string;
   threadId?: string;
+  sandbox?: "read-only" | "workspace-write" | "danger-full-access";
 };
 
 export function buildCodexExecArgs(input: BuildCodexExecArgsInput): string[] {
-  if (input.threadId) {
-    return ["exec", "resume", "--skip-git-repo-check", "--json", input.threadId, input.prompt];
+  const common = ["--skip-git-repo-check"];
+  if (input.sandbox) {
+    common.push("--sandbox", input.sandbox);
   }
-  return ["exec", "--skip-git-repo-check", "--json", input.prompt];
+  common.push("--json");
+  if (input.threadId) {
+    return ["exec", ...common, "resume", input.threadId, input.prompt];
+  }
+  return ["exec", ...common, input.prompt];
 }
 
 export type CodexExecRunnerOptions = {
   codexBin?: string;
+  sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   timeoutMs?: number;
 };
 
@@ -32,7 +39,7 @@ export class CodexExecRunner {
   run(input: BuildCodexExecArgsInput): Promise<CodexRunResult> {
     const codexCommand = resolveCodexCommand(this.options.codexBin ?? "codex");
     const timeoutMs = this.options.timeoutMs ?? 600_000;
-    const args = buildCodexExecArgs(input);
+    const args = buildCodexExecArgs({ ...input, sandbox: this.options.sandbox });
 
     return new Promise((resolve, reject) => {
       const child = spawn(codexCommand.command, [...codexCommand.argsPrefix, ...args], {
