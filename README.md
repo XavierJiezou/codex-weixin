@@ -1,7 +1,7 @@
 # codex-weixin
 
 <p align="center">
-  <img src="docs/images/logo.png" alt="codex-weixin logo" width="520" />
+  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
 </p>
 
 **中文** | [English](./README.en.md)
