@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { BridgeService } from "../bridge/service.js";
+import { userFacingMessageHandlingError } from "../bridge/errors.js";
 import { loadConfig, saveConfig } from "../state/config.js";
 import { RuntimeStateStore } from "../state/runtime-state.js";
 import { resolveStatePaths } from "../state/paths.js";
@@ -85,7 +86,7 @@ function commandDoctor(paths: ReturnType<typeof resolveStatePaths>): void {
   console.log(`default cwd: ${config.defaultCwd}`);
   console.log(`codex bin: ${config.codexBin}`);
   console.log(`backend: ${config.codexBackend}`);
-  console.log(`exec sandbox: ${config.codexExecSandbox}`);
+  console.log(`exec sandbox: ${config.codexExecSandbox ?? "(Codex default)"}`);
 }
 
 async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed: ReturnType<typeof parseArgs>): Promise<void> {
@@ -105,32 +106,15 @@ async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed:
   console.log(`codex-weixin serving account ${account.accountId}`);
   await monitorWeixin({
     client,
-    onMessage: async (message) => {
-      try {
-        await service.handleMessage(message);
-      } catch (error) {
-        const detail = error instanceof Error ? error.stack ?? error.message : String(error);
-        console.error(`[codex-weixin] message handling failed for ${message.senderId}: ${detail}`);
-        try {
-          await client.sendText({
-            toUserId: message.senderId,
-            text: userFacingMessageHandlingError(error),
-            contextToken: stateStore.getContextToken(message.senderId)
-          });
-        } catch (replyError) {
-          console.error(`[codex-weixin] failed to report error to ${message.senderId}: ${replyError instanceof Error ? replyError.message : String(replyError)}`);
-        }
-      }
+    onMessage: (message) => service.handleMessage(message),
+    onMessageError: async (error, message) => {
+      await client.sendText({
+        toUserId: message.senderId,
+        text: userFacingMessageHandlingError(error),
+        contextToken: stateStore.getContextToken(message.senderId)
+      });
     }
   });
-}
-
-function userFacingMessageHandlingError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/timed out|timeout/i.test(message)) {
-    return "[codex-weixin] 本轮任务执行时间过长，已停止处理。请把需求拆成更小步骤后重试。";
-  }
-  return "[codex-weixin] 本轮消息处理失败，详细错误已写入本机日志。";
 }
 
 function commandAccess(paths: ReturnType<typeof resolveStatePaths>, positionals: string[]): void {

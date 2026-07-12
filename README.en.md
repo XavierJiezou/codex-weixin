@@ -20,7 +20,7 @@ This is an early independent implementation. It is designed as a small, auditabl
 - Private chat only
 - Local-first state under `~/.codex-weixin`
 - Codex app-server preferred, `codex exec --json` fallback for fresh turns
-- `codex exec` uses `--sandbox danger-full-access` by default to avoid local command launch failures from the default sandbox in Windows background daemons; set `codexExecSandbox` in `config.json` to `workspace-write` or `read-only` for a stricter mode
+- Optional `codexExecSandbox` configuration for `codex exec`; when omitted, Codex's own configuration is preserved
 - Pairing and workspace allowlist by default
 - Inbound images, files, videos, and voice/audio without transcription are downloaded to local `inbound/` storage; WeChat voice with transcription is passed to Codex as text first
 - Native outbound image/video/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
@@ -172,12 +172,21 @@ Common Codex fields in `config.json`:
 ```json
 {
   "codexBin": "codex",
-  "codexBackend": "auto",
+  "codexBackend": "auto"
+}
+```
+
+`codexExecSandbox` only affects calls where `codexBackend` is `exec`, or where `auto` falls back to `exec`. Valid values are `read-only`, `workspace-write`, and `danger-full-access`. Omitting the field preserves Codex's own configuration.
+
+If a Windows background service reports `CreateProcessAsUserW failed: 1312`, and you accept giving Codex full access to the machine, add this setting and restart the service:
+
+```json
+{
   "codexExecSandbox": "danger-full-access"
 }
 ```
 
-`codexExecSandbox` only affects `codex exec` calls when `codexBackend` is `exec` or when `auto` falls back to `exec`. Valid values are `read-only`, `workspace-write`, and `danger-full-access`.
+Do not treat this as a harmless compatibility switch.
 
 ## Security Model
 
@@ -188,7 +197,7 @@ Common Codex fields in `config.json`:
 - `/bind` only accepts absolute paths under allowed workspaces.
 - Generated files are sent only through explicit action blocks, local absolute Markdown links, or local CLI commands.
 - Credentials stay local under `~/.codex-weixin/accounts`.
-- The default `codexExecSandbox` is `danger-full-access` because remote WeChat control of local Codex is already a guarded remote shell. If you only need limited file access, change it to a stricter sandbox in `config.json`.
+- `danger-full-access` bypasses the Codex filesystem sandbox. The workspace allowlist still constrains `/bind`, but it no longer constrains which local paths Codex commands can access.
 
 Recommended first run:
 

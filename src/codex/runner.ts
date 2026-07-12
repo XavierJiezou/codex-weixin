@@ -1,12 +1,13 @@
 import { AppServerCodexRunner, type CodexRunnerInput } from "./app-server-runner.js";
 import { CodexExecRunner, type CodexRunResult } from "./exec-runner.js";
+import type { CodexExecSandbox } from "./sandbox.js";
 
 export type CodexBackend = "auto" | "app-server" | "exec";
 
 export type HybridCodexRunnerOptions = {
   backend: CodexBackend;
   codexBin?: string;
-  execSandbox?: "read-only" | "workspace-write" | "danger-full-access";
+  execSandbox?: CodexExecSandbox;
   timeoutMs?: number;
 };
 

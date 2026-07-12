@@ -1,23 +1,48 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildCodexExecArgs, extractFinalText, parseCodexExecOutput } from "../src/codex/exec-runner.js";
+import {
+  buildCodexExecArgs,
+  extractFinalText,
+  formatCodexExecFailure,
+  parseCodexExecOutput
+} from "../src/codex/exec-runner.js";
 
-test("builds codex exec arguments for fresh and resumed sessions", () => {
+test("builds codex exec arguments without an explicit sandbox", () => {
   assert.deepEqual(
     buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project" }),
     ["exec", "--skip-git-repo-check", "--json", "hello"]
   );
 
   assert.deepEqual(
-    buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", sandbox: "danger-full-access" }),
-    ["exec", "--skip-git-repo-check", "--sandbox", "danger-full-access", "--json", "hello"]
+    buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", threadId: "abc" }),
+    ["exec", "resume", "--skip-git-repo-check", "--json", "abc", "hello"]
+  );
+});
+
+test("places the configured sandbox before the resume subcommand", () => {
+  for (const sandbox of ["read-only", "workspace-write", "danger-full-access"] as const) {
+    assert.deepEqual(
+      buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", sandbox }),
+      ["exec", "--skip-git-repo-check", "--sandbox", sandbox, "--json", "hello"]
+    );
+
+    assert.deepEqual(
+      buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", threadId: "abc", sandbox }),
+      ["exec", "--skip-git-repo-check", "--sandbox", sandbox, "--json", "resume", "abc", "hello"]
+    );
+  }
+});
+
+test("explains how to recover from the Windows background sandbox error", () => {
+  const error = formatCodexExecFailure(
+    1,
+    "windows sandbox: runner error: CreateProcessAsUserW failed: 1312"
   );
 
-  assert.deepEqual(
-    buildCodexExecArgs({ prompt: "hello", cwd: "/tmp/project", threadId: "abc", sandbox: "danger-full-access" }),
-    ["exec", "--skip-git-repo-check", "--sandbox", "danger-full-access", "--json", "resume", "abc", "hello"]
-  );
+  assert.match(error.message, /codexExecSandbox/);
+  assert.match(error.message, /danger-full-access/);
+  assert.match(error.message, /full access/i);
 });
 
 test("extracts nested agent_message text and thread id from codex json output", () => {

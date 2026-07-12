@@ -242,7 +242,7 @@ export class BridgeService {
       `workspace: ${this.options.stateStore.getWorkspace(senderId) ?? this.options.config.defaultCwd}`,
       `thread: ${this.options.stateStore.getThread(senderId) || "(new)"}`,
       `backend: ${this.options.config.codexBackend}`,
-      `exec sandbox: ${this.options.config.codexExecSandbox}`,
+      `exec sandbox: ${this.options.config.codexExecSandbox ?? "(Codex default)"}`,
       `model: ${this.options.config.model ?? "(default)"}`,
       `effort: ${this.options.config.effort ?? "(default)"}`
     ].join("\n");

@@ -2,28 +2,43 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import type { CodexExecSandbox } from "./sandbox.js";
+
 export type BuildCodexExecArgsInput = {
   prompt: string;
   cwd: string;
   threadId?: string;
-  sandbox?: "read-only" | "workspace-write" | "danger-full-access";
+  sandbox?: CodexExecSandbox;
 };
 
 export function buildCodexExecArgs(input: BuildCodexExecArgsInput): string[] {
-  const common = ["--skip-git-repo-check"];
-  if (input.sandbox) {
-    common.push("--sandbox", input.sandbox);
-  }
-  common.push("--json");
   if (input.threadId) {
-    return ["exec", ...common, "resume", input.threadId, input.prompt];
+    if (input.sandbox) {
+      return [
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox",
+        input.sandbox,
+        "--json",
+        "resume",
+        input.threadId,
+        input.prompt
+      ];
+    }
+    return ["exec", "resume", "--skip-git-repo-check", "--json", input.threadId, input.prompt];
   }
-  return ["exec", ...common, input.prompt];
+  return [
+    "exec",
+    "--skip-git-repo-check",
+    ...(input.sandbox ? ["--sandbox", input.sandbox] : []),
+    "--json",
+    input.prompt
+  ];
 }
 
 export type CodexExecRunnerOptions = {
   codexBin?: string;
-  sandbox?: "read-only" | "workspace-write" | "danger-full-access";
+  sandbox?: CodexExecSandbox;
   timeoutMs?: number;
 };
 
@@ -39,7 +54,10 @@ export class CodexExecRunner {
   run(input: BuildCodexExecArgsInput): Promise<CodexRunResult> {
     const codexCommand = resolveCodexCommand(this.options.codexBin ?? "codex");
     const timeoutMs = this.options.timeoutMs ?? 600_000;
-    const args = buildCodexExecArgs({ ...input, sandbox: this.options.sandbox });
+    const args = buildCodexExecArgs({
+      ...input,
+      sandbox: this.options.sandbox ?? input.sandbox
+    });
 
     return new Promise((resolve, reject) => {
       const child = spawn(codexCommand.command, [...codexCommand.argsPrefix, ...args], {
@@ -64,7 +82,7 @@ export class CodexExecRunner {
         const raw = Buffer.concat(stdout).toString("utf8");
         const err = Buffer.concat(stderr).toString("utf8");
         if (code !== 0) {
-          reject(new Error(`codex exec exited with code ${code}: ${err.trim()}`));
+          reject(formatCodexExecFailure(code, err));
           return;
         }
         const parsed = parseCodexExecOutput(raw);
@@ -72,6 +90,18 @@ export class CodexExecRunner {
       });
     });
   }
+}
+
+export function formatCodexExecFailure(code: number | null, stderr: string): Error {
+  const detail = stderr.trim();
+  const base = `codex exec exited with code ${code ?? "unknown"}: ${detail}`;
+  if (/CreateProcessAsUserW failed:\s*1312/i.test(detail)) {
+    return new Error(
+      `${base}\nWindows background sandbox startup failed. ` +
+      `Set "codexExecSandbox": "danger-full-access" in ~/.codex-weixin/config.json only if you accept full access to this machine.`
+    );
+  }
+  return new Error(base);
 }
 
 function resolveCodexCommand(codexBin: string): { command: string; argsPrefix: string[] } {
