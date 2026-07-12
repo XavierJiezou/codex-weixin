@@ -18,24 +18,24 @@
 
 ## 功能状态
 
-截图统一建议放在 `docs/images/screenshots/`。表格里的路径就是每项功能预留的截图位置。
+截图统一建议放在 `docs/images/screenshots/`。表格里的路径就是每项功能预留的截图位置。状态符号：✅ 已支持，☑️ 已支持但默认关闭，⬜ 待办。
 
 | 状态 | 功能 | 说明 | 截图位置 |
 | --- | --- | --- | --- |
-| 已支持 | 微信私聊文本指令 | 直接发送文字即可让 Codex 看代码、改文件、解释报错或回答问题。 | 待补：`docs/images/screenshots/text-command.png` |
-| 已支持 | 顶部“对方正在输入...” | Codex 长时间思考时持续发送 typing 状态，避免看起来像服务停住了。 | 待补：`docs/images/screenshots/typing.png` |
-| 已支持 | 微信语音指令 | 有微信转写文本时按文字处理；无转写时下载为音频附件交给 Codex。 | 待补：`docs/images/screenshots/voice-command.png` |
-| 已支持 | 多媒体内容理解 | 图片、音频、视频、文件会保存到本机，并以本地路径加入 prompt。 | 待补：`docs/images/screenshots/media-understanding.png` |
-| 已支持 | `/prompt start` / `/prompt done` | 适合把多条文字、语音、图片、文件打包成一次 Codex 请求。 | 待补：`docs/images/screenshots/prompt-buffer.png` |
-| 已支持 | 多媒体双向传输 | 微信可发媒体给 Codex；Codex 可回传本机图片、视频和文件，音频按文件发送。 | 待补：`docs/images/screenshots/media-transfer.png` |
-| 已支持 | `/new` 新建会话 | 下一条消息开启新的 Codex thread，不继续沿用上一轮上下文。 | 待补：`docs/images/screenshots/new-thread.png` |
-| 已支持，默认关闭 | Codex 思考过程转发 | 可把 Codex 中间思考过程转发到微信；默认关闭，避免刷屏。 | 待补：`docs/images/screenshots/thinking-trace.png` |
-| 已支持 | `/stop` 中断任务 | app-server 可用时，尝试中断当前 Codex 任务。 | 待补：`docs/images/screenshots/stop-task.png` |
-| 已支持 | 权限和工作区绑定 | 未知 sender 默认拒绝；`/bind` 只允许绑定 allowlist 内的工作区。 | 待补：`docs/images/screenshots/access-bind.png` |
-| 已支持 | Codex exec sandbox 配置 | 可通过 `codexExecSandbox` 显式设置 `codex exec` sandbox；未设置时沿用 Codex 自身配置。 | 待补：`docs/images/screenshots/exec-sandbox.png` |
-| 待办 | 带中间过程的流式消息回复 | 让 Codex 回复边生成边分段推送，而不是只等最终答案。 | 待补：`docs/images/screenshots/streaming-reply.png` |
-| 待办 | 一个 Codex 接多个微信账号 | 同一个本地 Codex 服务同时服务多个微信登录账号。 | 待补：`docs/images/screenshots/multi-wechat-accounts.png` |
-| 待办 | 微信端切换 Codex 模型 | 在微信里通过命令选择或切换 Codex 模型。 | 待补：`docs/images/screenshots/model-switch.png` |
+| ✅ | 微信私聊文本指令 | 直接发送文字即可让 Codex 看代码、改文件、解释报错或回答问题。 | 待补：`docs/images/screenshots/text-command.png` |
+| ✅ | 顶部“对方正在输入...” | Codex 长时间思考时持续发送 typing 状态，避免看起来像服务停住了。 | 待补：`docs/images/screenshots/typing.png` |
+| ✅ | 微信语音指令 | 有微信转写文本时按文字处理；无转写时下载为音频附件交给 Codex。 | 待补：`docs/images/screenshots/voice-command.png` |
+| ✅ | 多媒体内容理解 | 图片、音频、视频、文件会保存到本机，并以本地路径加入 prompt。 | 待补：`docs/images/screenshots/media-understanding.png` |
+| ✅ | `/prompt start` / `/prompt done` | 适合把多条文字、语音、图片、文件打包成一次 Codex 请求。 | 待补：`docs/images/screenshots/prompt-buffer.png` |
+| ✅ | 多媒体双向传输 | 微信可发媒体给 Codex；Codex 可回传本机图片、视频和文件，音频按文件发送。 | 待补：`docs/images/screenshots/media-transfer.png` |
+| ✅ | `/new` 新建会话 | 下一条消息开启新的 Codex thread，不继续沿用上一轮上下文。 | 待补：`docs/images/screenshots/new-thread.png` |
+| ☑️ | Codex 思考过程转发 | 可把 Codex 中间思考过程转发到微信；默认关闭，避免刷屏。 | 待补：`docs/images/screenshots/thinking-trace.png` |
+| ✅ | `/stop` 中断任务 | app-server 可用时，尝试中断当前 Codex 任务。 | 待补：`docs/images/screenshots/stop-task.png` |
+| ✅ | 权限和工作区绑定 | 未知 sender 默认拒绝；`/bind` 只允许绑定 allowlist 内的工作区。 | 待补：`docs/images/screenshots/access-bind.png` |
+| ✅ | Codex exec sandbox 配置 | 可通过 `codexExecSandbox` 显式设置 `codex exec` sandbox；未设置时沿用 Codex 自身配置。 | 待补：`docs/images/screenshots/exec-sandbox.png` |
+| ⬜ | 带中间过程的流式消息回复 | 让 Codex 回复边生成边分段推送，而不是只等最终答案。 | 待补：`docs/images/screenshots/streaming-reply.png` |
+| ⬜ | 一个 Codex 接多个微信账号 | 同一个本地 Codex 服务同时服务多个微信登录账号。 | 待补：`docs/images/screenshots/multi-wechat-accounts.png` |
+| ⬜ | 微信端切换 Codex 模型 | 在微信里通过命令选择或切换 Codex 模型。 | 待补：`docs/images/screenshots/model-switch.png` |
 
 ## 快速开始
 
