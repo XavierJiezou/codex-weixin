@@ -12,9 +12,9 @@
 
 </p>
 
-```text
-微信私聊 <-> codex-weixin 本地服务 <-> 本机 Codex <-> 你的项目目录
-```
+<p align="center">
+  <code>微信私聊 &lt;-&gt; codex-weixin 本地服务 &lt;-&gt; 本机 Codex &lt;-&gt; 你的项目目录</code>
+</p>
 
 当前版本面向微信个人号私聊和自用场景，默认启用 sender allowlist 和 workspace allowlist。微信群聊/多人机器人能力受微信开放能力限制，暂不作为目标能力。
 
