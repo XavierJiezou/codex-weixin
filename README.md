@@ -4,9 +4,10 @@
   <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
 </p>
 
-**中文** | [English](./README.en.md)
+
 
 <p align="center">
+  **中文** | [English](./README.en.md)
   <b>把微信变成本机 OpenAI Codex 的随身入口。</b>
 </p>
 
