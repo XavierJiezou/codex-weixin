@@ -1,17 +1,15 @@
 # codex-weixin
 
 <p align="center">
-  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
-</p>
+  
+<img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
 
 **中文** | [English](./README.en.md)
 
-<p align="center">
-  <b>把微信变成本机 OpenAI Codex 的随身入口。</b>
-</p>
+<b>把微信变成本机 OpenAI Codex 的随身入口。</b>
 
-<p align="center">
-  在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
+在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
+
 </p>
 
 ```text
