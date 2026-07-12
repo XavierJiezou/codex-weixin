@@ -1,22 +1,28 @@
+<h1 align="center">codex-weixin</h1>
+
 <p align="center">
-  
-# codex-weixin
+  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
+</p>
 
-<img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
+<p align="center">
+  <strong>中文</strong> | <a href="./README.en.md">English</a>
+</p>
 
-**中文** | [English](./README.en.md)
+<p align="center">
+  <strong>把微信变成本机 OpenAI Codex 的随身入口。</strong>
+</p>
 
-<b>把微信变成本机 OpenAI Codex 的随身入口。</b>
-
-在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
-
+<p align="center">
+  在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
 </p>
 
 <p align="center">
   <code>微信私聊 &lt;-&gt; codex-weixin 本地服务 &lt;-&gt; 本机 Codex &lt;-&gt; 你的项目目录</code>
 </p>
 
-当前版本面向微信个人号私聊和自用场景，默认启用 sender allowlist 和 workspace allowlist。微信群聊/多人机器人能力受微信开放能力限制，暂不作为目标能力。
+<p align="center">
+  当前版本面向微信个人号私聊和自用场景，默认启用 sender allowlist 和 workspace allowlist。微信群聊/多人机器人能力受微信开放能力限制，暂不作为目标能力。
+</p>
 
 ## 功能状态
 
