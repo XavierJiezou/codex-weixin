@@ -1,7 +1,7 @@
+<center>
+  
 # codex-weixin
 
-<p align="center">
-  
 <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
 
 **中文** | [English](./README.en.md)
@@ -10,7 +10,7 @@
 
 在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
 
-</p>
+</center>
 
 ```text
 微信私聊 <-> codex-weixin 本地服务 <-> 本机 Codex <-> 你的项目目录
