@@ -1,4 +1,4 @@
-<center>
+<p align="center">
   
 # codex-weixin
 
@@ -10,7 +10,7 @@
 
 在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
 
-</center>
+</p>
 
 ```text
 微信私聊 <-> codex-weixin 本地服务 <-> 本机 Codex <-> 你的项目目录
