@@ -47,7 +47,18 @@
 
 ## 快速开始
 
-准备环境：
+推荐直接把本项目链接交给你正在使用的 agent 工具，让它自己安排安装、配置和启动：
+
+```text
+请参考 https://github.com/XavierJiezou/codex-weixin
+帮我在这台电脑上安装并配置 codex-weixin，把本机 Codex 接入微信。
+请检查 Node.js、Git 和 Codex CLI 登录状态，克隆/构建项目，引导我完成微信扫码登录，
+配置 sender allowlist 与 workspace allowlist，并启动服务。
+```
+
+agent 工具会根据当前机器环境自行执行 `doctor`、`login`、`serve`、`status` 和 `access allow` 等步骤；需要扫码或确认权限时，按它的提示操作即可。下面命令仅作为手动安装或排障参考。
+
+### 手动环境检查
 
 - Node.js `>=22`
 - Git
@@ -59,7 +70,7 @@ codex --version
 codex
 ```
 
-从源码安装：
+### 手动源码安装
 
 ```bash
 git clone https://github.com/XavierJiezou/codex-weixin.git
@@ -78,6 +89,8 @@ npx tsx src/cli/index.ts doctor
 如果 Windows PowerShell 遇到 `npm.ps1` 执行策略问题，可以把 `npm` 换成 `npm.cmd`。
 
 ## 第一次启动
+
+通常不需要手动照着下面一步步执行。把 GitHub 链接交给 agent 工具后，它可以自行完成登录、启动、sender 授权和 workspace 绑定；下面流程主要用于你想手动操作或排查问题时参考。
 
 1. 微信扫码登录：
 
