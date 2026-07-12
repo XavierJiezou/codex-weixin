@@ -20,6 +20,7 @@
 - 仅支持私聊
 - 本地状态默认保存在 `~/.codex-weixin`
 - 优先使用 Codex app-server；新会话在 app-server 不可用时可回退到 `codex exec --json`
+- 可通过 `codexExecSandbox` 显式设置 `codex exec` sandbox；未设置时沿用 Codex 自身配置
 - 默认启用微信发送者配对和 workspace allowlist
 - 支持入站图片、文件、视频和无转写语音/音频下载到本地 `inbound/`；带转写的微信语音会优先按文本交给 Codex
 - 支持出站图片/视频/文件动作：本地文件会通过 iLink `getuploadurl`、微信 CDN 上传和 `sendmessage` 原生发送
@@ -170,6 +171,27 @@ Codex 可以在最终回复里显式声明 host action：
 
 不要提交或分享这个目录。
 
+`config.json` 中常用的 Codex 字段：
+
+```json
+{
+  "codexBin": "codex",
+  "codexBackend": "auto"
+}
+```
+
+`codexExecSandbox` 只影响 `codexBackend` 为 `exec`，或 `auto` 回退到 `exec` 时的调用。可选值为 `read-only`、`workspace-write`、`danger-full-access`；省略该字段时沿用 Codex 自身配置。
+
+如果 Windows 后台服务报错 `CreateProcessAsUserW failed: 1312`，并且你接受 Codex 获得整机访问权限的风险，可以添加以下配置后重启服务：
+
+```json
+{
+  "codexExecSandbox": "danger-full-access"
+}
+```
+
+不要仅为消除报错而忽略这个权限变化。
+
 ## 安全模型
 
 `codex-weixin` 允许微信远程控制本机 Codex。请把它当作带护栏的远程 shell：
@@ -179,6 +201,7 @@ Codex 可以在最终回复里显式声明 host action：
 - `/bind` 只接受允许 workspace 下的绝对路径
 - 生成文件只有在明确动作块、本地绝对 Markdown 链接或本地 CLI 命令中才会发送
 - 微信凭证只保存在本机 `~/.codex-weixin/accounts`
+- `danger-full-access` 会绕过 Codex 的文件系统 sandbox；workspace allowlist 仍限制 `/bind`，但不再限制 Codex 命令可访问的本机路径
 
 推荐首次运行：
 

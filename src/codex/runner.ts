@@ -1,11 +1,13 @@
 import { AppServerCodexRunner, type CodexRunnerInput } from "./app-server-runner.js";
 import { CodexExecRunner, type CodexRunResult } from "./exec-runner.js";
+import type { CodexExecSandbox } from "./sandbox.js";
 
 export type CodexBackend = "auto" | "app-server" | "exec";
 
 export type HybridCodexRunnerOptions = {
   backend: CodexBackend;
   codexBin?: string;
+  execSandbox?: CodexExecSandbox;
   timeoutMs?: number;
 };
 
@@ -20,6 +22,7 @@ export class HybridCodexRunner {
     });
     this.exec = new CodexExecRunner({
       codexBin: options.codexBin,
+      sandbox: options.execSandbox,
       timeoutMs: options.timeoutMs
     });
   }

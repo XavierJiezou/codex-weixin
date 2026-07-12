@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { BridgeService } from "../bridge/service.js";
+import { userFacingMessageHandlingError } from "../bridge/errors.js";
 import { loadConfig, saveConfig } from "../state/config.js";
 import { RuntimeStateStore } from "../state/runtime-state.js";
 import { resolveStatePaths } from "../state/paths.js";
@@ -85,6 +86,7 @@ function commandDoctor(paths: ReturnType<typeof resolveStatePaths>): void {
   console.log(`default cwd: ${config.defaultCwd}`);
   console.log(`codex bin: ${config.codexBin}`);
   console.log(`backend: ${config.codexBackend}`);
+  console.log(`exec sandbox: ${config.codexExecSandbox ?? "(Codex default)"}`);
 }
 
 async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed: ReturnType<typeof parseArgs>): Promise<void> {
@@ -104,7 +106,14 @@ async function commandServe(paths: ReturnType<typeof resolveStatePaths>, parsed:
   console.log(`codex-weixin serving account ${account.accountId}`);
   await monitorWeixin({
     client,
-    onMessage: (message) => service.handleMessage(message)
+    onMessage: (message) => service.handleMessage(message),
+    onMessageError: async (error, message) => {
+      await client.sendText({
+        toUserId: message.senderId,
+        text: userFacingMessageHandlingError(error),
+        contextToken: stateStore.getContextToken(message.senderId)
+      });
+    }
   });
 }
 
