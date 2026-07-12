@@ -1,5 +1,9 @@
 # codex-weixin
 
+<p align="center">
+  <img src="docs/images/logo.png" alt="codex-weixin logo" width="520" />
+</p>
+
 **中文** | [English](./README.en.md)
 
 <p align="center">
@@ -14,7 +18,7 @@
 微信私聊 <-> codex-weixin 本地服务 <-> 本机 Codex <-> 你的项目目录
 ```
 
-当前版本面向个人私聊和自用场景，默认启用 sender allowlist 和 workspace allowlist。请把它当作一个带护栏的远程 Codex 入口，而不是多人群聊机器人。
+当前版本面向微信个人号私聊和自用场景，默认启用 sender allowlist 和 workspace allowlist。微信群聊/多人机器人能力受微信开放能力限制，暂不作为目标能力。
 
 ## 功能状态
 
