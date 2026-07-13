@@ -9,13 +9,13 @@
 </p>
 
 <p align="center">
-  <strong>把多个个人微信账号接入本机 OpenAI Codex。</strong>
+  <strong>把个人微信账号接入本机 OpenAI Codex。</strong>
 </p>
 
 `codex-weixin` 是一个跨平台、本机运行的微信到 Codex 专用服务。启动后会打开 Web 管理页；用户在页面扫码登录微信，即可从微信私聊控制本机 Codex、管理工作目录和切换会话。
 
 ```text
-多个微信账号 <-> codex-weixin <-> 本机 Codex <-> 允许的工作目录
+微信账号 <-> codex-weixin <-> 本机 Codex <-> 允许的工作目录
 ```
 
 它不是通用消息网关，不接入其他聊天平台，也不把管理页面开放到局域网或公网。
