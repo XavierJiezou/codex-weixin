@@ -1,8 +1,16 @@
-# codex-weixin
+<h1 align="center">codex-weixin</h1>
 
-**Connect multiple personal WeChat accounts to a local OpenAI Codex installation.**
+<p align="center">
+  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="480" />
+</p>
 
-[中文](./README.md) | **English**
+<p align="center">
+  <a href="./README.md">中文</a> | <strong>English</strong>
+</p>
+
+<p align="center">
+  <strong>Connect multiple personal WeChat accounts to a local OpenAI Codex installation.</strong>
+</p>
 
 `codex-weixin` is a cross-platform, local-only WeChat service dedicated to Codex. Starting it opens a Web management page where users scan a WeChat QR code, manage accounts and workspaces, and switch Codex sessions.
 
@@ -12,21 +20,29 @@ Multiple WeChat accounts <-> codex-weixin <-> local Codex <-> allowed workspaces
 
 It is not a general messaging gateway. The management page is never exposed to the LAN or public Internet.
 
-## Features
+## Feature status
 
-- Local Web management page bound to `127.0.0.1`.
-- Concurrent monitoring for multiple enabled WeChat accounts.
-- Local account remarks that replace generic account labels throughout the session UI.
-- Browser QR login with waiting, scanned, confirmed, and expired states.
-- Managed Codex sessions grouped by WeChat-account tabs: render Markdown history, continue from the Web page, create, rename, activate, reset, and delete.
-- Web session attachments: send one prompt with up to 10 files (50 MB total); uploads and files sent by Codex appear on the matching history message with playback, preview, and download controls.
-- Typing state: the matching Web session shows when a Codex turn started from WeChat or the Web page is still running.
-- Model settings loaded from Codex app-server, with model-specific reasoning-effort dropdowns and GPT-5.6 Sol, Terra, and Luna for the IkunCoding provider.
-- Account isolation for sender authorization, context tokens, workspaces, threads, and inbound files.
-- Deny-by-default sender authorization managed from the account page.
-- Persistent per-account sync cursors and message IDs prevent duplicate deliveries from producing two Codex replies.
-- WeChat private-chat text, transcribed voice, image, audio, video, and file input.
-- Text and local image, video, and file delivery back to WeChat.
+Screenshots live under `docs/images/screenshots/`. The Web management screenshot is included; rows that require a phone view reserve stable filenames for later WeChat captures.
+
+| Status | Feature | Details | Screenshot |
+| --- | --- | --- | --- |
+| ✅ | Local Web management | A `127.0.0.1`-only page manages WeChat accounts, sessions, workspaces, and Codex settings. | [Web sessions](docs/images/screenshots/web-session-management.png) |
+| ✅ | Multiple WeChat accounts | One service runs multiple accounts with local remarks and isolated authorization, attachments, and sessions. | [Web sessions](docs/images/screenshots/web-session-management.png) |
+| ✅ | Browser QR connection | Shows waiting, scanned, connected, and expired QR states. | Pending: `docs/images/screenshots/wechat-qr-login.png` |
+| ✅ | Session management | Grouped account tabs, Markdown history, continued Codex threads, and create, rename, activate, reset, and delete actions. | [Web sessions](docs/images/screenshots/web-session-management.png) |
+| ✅ | Web text and attachments | Send text with up to 10 files (50 MB total), with media playback, preview, and download in history. | Pending: `docs/images/screenshots/web-attachments.png` |
+| ✅ | WeChat private-chat control | Supports regular messages plus `/status`, `/new`, `/bind`, `/prompt start`, `/prompt done`, and `/stop`. | Pending: `docs/images/screenshots/wechat-chat.png` |
+| ✅ | WeChat media input | Accepts transcribed voice, images, audio, video, and files as local Codex attachments. | Pending: `docs/images/screenshots/wechat-media-input.png` |
+| ✅ | File delivery to WeChat | Codex can return local images, videos, and files as native WeChat messages. | Pending: `docs/images/screenshots/wechat-media-output.png` |
+| ✅ | Models and reasoning effort | Model-aware dropdowns loaded from app-server, including GPT-5.6 Sol, Terra, and Luna for IkunCoding. | Pending: `docs/images/screenshots/web-model-settings.png` |
+| ✅ | Typing state and deduplication | Web typing state plus persistent sync cursors and message IDs prevent duplicate replies. | Pending: `docs/images/screenshots/wechat-typing.png` |
+| ✅ | App-server first | New and resumed sessions prefer Codex app-server V2 and fall back to `codex exec` when unavailable. | Pending: `docs/images/screenshots/wechat-status.png` |
+
+## Web management preview
+
+<p align="center">
+  <img src="docs/images/screenshots/web-session-management.png" alt="codex-weixin Web session management" width="100%" />
+</p>
 
 ## Requirements
 
@@ -41,6 +57,15 @@ codex
 ```
 
 ## Install and start
+
+Install globally from npm:
+
+```bash
+npm install -g codex-weixin
+codex-weixin
+```
+
+Or install from source:
 
 ```bash
 git clone https://github.com/XavierJiezou/codex-weixin.git

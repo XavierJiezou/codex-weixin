@@ -2,6 +2,17 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.1] - 2026-07-14
+
+### Changed
+
+- Restored the README logo, feature-status tables, and screenshot locations for phone-based WeChat examples.
+- Added a sanitized Web session-management preview generated from the actual local management page.
+
+### Fixed
+
+- Marked the built server entry point executable so npm keeps the `codex-weixin` command in the published package.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added
@@ -30,4 +41,5 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.1
 [0.2.0]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.0

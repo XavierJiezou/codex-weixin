@@ -20,3 +20,4 @@ fs.copyFileSync(
   path.join(root, "node_modules", "dompurify", "dist", "purify.min.js"),
   path.join(target, "vendor", "purify.min.js")
 );
+fs.chmodSync(path.join(root, "dist", "server", "index.js"), 0o755);

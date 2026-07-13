@@ -1,11 +1,15 @@
 <h1 align="center">codex-weixin</h1>
 
 <p align="center">
-  <strong>把多个个人微信账号接入本机 OpenAI Codex。</strong>
+  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="480" />
 </p>
 
 <p align="center">
   <strong>中文</strong> | <a href="./README.en.md">English</a>
+</p>
+
+<p align="center">
+  <strong>把多个个人微信账号接入本机 OpenAI Codex。</strong>
 </p>
 
 `codex-weixin` 是一个跨平台、本机运行的微信到 Codex 专用服务。启动后会打开 Web 管理页；用户在页面扫码登录微信，即可从微信私聊控制本机 Codex、管理工作目录和切换会话。
@@ -16,22 +20,29 @@
 
 它不是通用消息网关，不接入其他聊天平台，也不把管理页面开放到局域网或公网。
 
-## 功能
+## 功能状态
 
-- 本机 Web 管理页：固定监听 `127.0.0.1`。
-- 多微信账号：一个服务并行运行多个已启用账号。
-- 本机账号备注：可给每个微信账号设置自定义名称，并同步显示在会话标签中。
-- 网页扫码：显示等待扫码、已扫码、已连接和过期状态。
-- 会话管理：按微信账号标签分类，查看带 Markdown 渲染的历史消息，并可在 Web 页面继续同一个 Codex thread；同时支持新建、重命名、切换、重置和删除。
-- Web 会话附件：可随提示词一次上传最多 10 个文件（合计 50 MB）；上传文件与 Codex 已发送到微信的视频、图片和文件都会显示在对应历史消息中，支持播放、预览和下载。
-- 输入状态：微信或 Web 发起 Codex turn 时，对应 Web 会话会显示“对方正在输入…”。
-- 模型设置：从 Codex app-server 读取模型和推理强度，并在设置页通过下拉列表切换；IkunCoding 提供方支持 GPT-5.6 Sol、Terra 和 Luna。
-- 会话隔离：不同微信账号和联系人拥有独立 sender、context token、workspace 和 thread。
-- 联系人授权：未知联系人默认拒绝，可在账号页面允许或撤销。
-- 消息去重：按微信账号持久记录同步游标和消息 ID，防止重复投递触发两次 Codex 回复。
-- 微信私聊文本、语音转写、图片、音频、视频和文件入站。
-- Codex 回复文本以及本机图片、视频和文件回传微信。
-- `/new`、`/bind`、`/prompt start`、`/prompt done` 和 `/stop`。
+截图统一放在 `docs/images/screenshots/`。Web 管理页截图已补齐；需要手机微信画面的功能保留了固定文件名，后续可直接补图。
+
+| 状态 | 功能 | 说明 | 截图 |
+| --- | --- | --- | --- |
+| ✅ | 本机 Web 管理 | 页面只监听 `127.0.0.1`，集中管理微信账号、会话、工作目录和 Codex 设置。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
+| ✅ | 多微信账号 | 一个服务并行运行多个微信账号，支持本机备注、独立授权、独立附件与会话状态。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
+| ✅ | 网页扫码接入 | 显示等待扫码、已扫码、已连接和二维码过期状态。 | 待补：`docs/images/screenshots/wechat-qr-login.png` |
+| ✅ | 会话管理 | 按微信账号分类，查看 Markdown 历史并继续同一 Codex thread；支持新建、重命名、切换、重置和删除。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
+| ✅ | Web 文本与附件 | 一次发送文本和最多 10 个文件（合计 50 MB），历史中可播放、预览或下载媒体。 | 待补：`docs/images/screenshots/web-attachments.png` |
+| ✅ | 微信私聊控制 | 支持普通消息和 `/status`、`/new`、`/bind`、`/prompt start`、`/prompt done`、`/stop`。 | 待补：`docs/images/screenshots/wechat-chat.png` |
+| ✅ | 微信多媒体输入 | 接收语音转写、图片、音频、视频和文件，并以本机附件交给 Codex。 | 待补：`docs/images/screenshots/wechat-media-input.png` |
+| ✅ | 文件回传微信 | Codex 可把本机图片、视频和文件作为微信原生消息发回。 | 待补：`docs/images/screenshots/wechat-media-output.png` |
+| ✅ | 模型和推理强度 | 从 app-server 读取模型能力并通过下拉列表切换；IkunCoding 支持 GPT-5.6 Sol、Terra 和 Luna。 | 待补：`docs/images/screenshots/web-model-settings.png` |
+| ✅ | 输入状态与去重 | Web 显示“对方正在输入…”，并持久记录同步游标和消息 ID，防止重复回复。 | 待补：`docs/images/screenshots/wechat-typing.png` |
+| ✅ | App-server 优先 | 新旧会话优先使用 Codex app-server V2；不可用时自动回退到 `codex exec`。 | 待补：`docs/images/screenshots/wechat-status.png` |
+
+## Web 管理页预览
+
+<p align="center">
+  <img src="docs/images/screenshots/web-session-management.png" alt="codex-weixin Web 会话管理页面" width="100%" />
+</p>
 
 ## 环境要求
 
@@ -47,18 +58,21 @@ codex
 
 ## 安装
 
+推荐从 npm 全局安装：
+
+```bash
+npm install -g codex-weixin
+codex-weixin
+```
+
+也可以从源码安装：
+
 ```bash
 git clone https://github.com/XavierJiezou/codex-weixin.git
 cd codex-weixin
 npm install
 npm run build
 npm install -g .
-```
-
-启动服务：
-
-```bash
-codex-weixin
 ```
 
 服务会自动打开 [http://127.0.0.1:8787](http://127.0.0.1:8787)。如果不希望全局安装，也可以在项目目录运行：

@@ -1,6 +1,6 @@
 {
   "name": "codex-weixin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local multi-account WeChat server for OpenAI Codex.",
   "license": "MIT",
   "author": "Xuechao Zou",
@@ -21,7 +21,7 @@
   ],
   "type": "module",
   "bin": {
-    "codex-weixin": "./dist/server/index.js"
+    "codex-weixin": "dist/server/index.js"
   },
   "files": [
     "dist/",
