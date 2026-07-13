@@ -10,7 +10,9 @@ export type WeixinAccount = {
   baseUrl: string;
   cdnBaseUrl: string;
   userId?: string;
+  displayName?: string;
   savedAt: string;
+  enabled: boolean;
 };
 
 export const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com";
@@ -30,13 +32,46 @@ export function listAccounts(paths: StatePaths): WeixinAccount[] {
   return fs.readdirSync(paths.accountsDir)
     .filter((name) => name.endsWith(".json"))
     .map((name) => readJsonFile<WeixinAccount>(path.join(paths.accountsDir, name), undefined as never))
+    .map((account) => ({ ...account, enabled: account.enabled !== false }))
     .sort((a, b) => a.accountId.localeCompare(b.accountId));
+}
+
+export function setAccountEnabled(paths: StatePaths, accountId: string, enabled: boolean): WeixinAccount {
+  const account = loadAccount(paths, accountId);
+  const updated = { ...account, enabled };
+  saveAccount(paths, updated);
+  return updated;
+}
+
+export function setAccountDisplayName(paths: StatePaths, accountId: string, displayName: string): WeixinAccount {
+  const account = loadAccount(paths, accountId);
+  const updated: WeixinAccount = { ...account };
+  const normalized = displayName.trim();
+  if (normalized) {
+    updated.displayName = normalized;
+  } else {
+    delete updated.displayName;
+  }
+  saveAccount(paths, updated);
+  return updated;
+}
+
+export function deleteAccount(paths: StatePaths, accountId: string): void {
+  const account = loadAccount(paths, accountId);
+  fs.rmSync(path.join(paths.accountsDir, `${normalizeAccountId(account.accountId)}.json`), { force: true });
+}
+
+export type PublicWeixinAccount = Omit<WeixinAccount, "token">;
+
+export function publicAccount(account: WeixinAccount): PublicWeixinAccount {
+  const { token: _token, ...safe } = account;
+  return safe;
 }
 
 export function loadAccount(paths: StatePaths, accountId?: string): WeixinAccount {
   const accounts = listAccounts(paths);
   if (accounts.length === 0) {
-    throw new Error("No WeChat account found. Run: codex-weixin login");
+    throw new Error("No WeChat account found. Open codex-weixin and add an account.");
   }
   if (!accountId) {
     if (accounts.length > 1) {
@@ -51,4 +86,3 @@ export function loadAccount(paths: StatePaths, accountId?: string): WeixinAccoun
   }
   return found;
 }
-

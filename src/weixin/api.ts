@@ -33,11 +33,11 @@ export class WeixinApiClient {
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
-  async getUpdates(syncKey?: string): Promise<unknown> {
+  async getUpdates(syncKey?: string, signal?: AbortSignal): Promise<unknown> {
     return this.post("ilink/bot/getupdates", {
       get_updates_buf: syncKey ?? "",
       base_info: { channel_version: "0.1.0" }
-    });
+    }, signal);
   }
 
   async sendText(input: {
@@ -210,9 +210,10 @@ export class WeixinApiClient {
     return { messageId: String(response.message_id ?? response.msgid ?? clientId) };
   }
 
-  private async post(endpoint: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async post(endpoint: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<Record<string, unknown>> {
     const response = await this.fetchImpl(`${this.baseUrl}/${endpoint}`, {
       method: "POST",
+      signal,
       headers: {
         "Content-Type": "application/json",
         AuthorizationType: "ilink_bot_token",

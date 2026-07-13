@@ -85,3 +85,13 @@ test("extracts local markdown video links into native video send actions", () =>
   ]);
   assert.equal(parsed.visibleText, "");
 });
+
+test("accepts legacy codex-weixin-server action blocks from existing threads", () => {
+  const parsed = parseActionBlocks([
+    "```codex-weixin-server-actions",
+    JSON.stringify({ send: [{ type: "file", path: "/tmp/legacy.txt" }] }),
+    "```"
+  ].join("\n"));
+
+  assert.deepEqual(parsed.actions.send, [{ type: "file", path: "/tmp/legacy.txt" }]);
+});

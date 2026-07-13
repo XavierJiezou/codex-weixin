@@ -12,6 +12,62 @@ import { RuntimeStateStore } from "../src/state/runtime-state.js";
 import { encryptAesEcb } from "../src/weixin/media.js";
 import { normalizeWeixinMessage } from "../src/weixin/messages.js";
 
+test("reports WeChat Codex turn status and resolves runtime details for status", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-status-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const replies: string[] = [];
+  const statuses: Array<{ senderId: string; sessionId: string; active: boolean }> = [];
+  const service = new BridgeService({
+    config: {
+      ...defaultConfig(tmpDir),
+      allowedSenderIds: ["alice@im.wechat"],
+      codexBackend: "auto"
+    },
+    stateStore,
+    onTurnStatus: (status) => statuses.push(status),
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        replies.push(input.text);
+        return { messageId: "text-message" };
+      }
+    } as never,
+    runner: {
+      async run() {
+        return { raw: "", text: "完成", threadId: "thread-status" };
+      },
+      async getRuntimeInfo() {
+        return { model: "gpt-test", effort: "high" };
+      },
+      async stop() {}
+    } as never
+  });
+
+  await service.handleMessage({
+    id: "turn",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "开始",
+    raw: {}
+  });
+  const sessionId = stateStore.getActiveSession("alice@im.wechat")?.id;
+  assert.deepEqual(statuses, [
+    { senderId: "alice@im.wechat", sessionId, active: true },
+    { senderId: "alice@im.wechat", sessionId, active: false }
+  ]);
+
+  await service.handleMessage({
+    id: "status",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "/status",
+    raw: {}
+  });
+  assert.match(replies.at(-1) ?? "", /model: gpt-test/);
+  assert.match(replies.at(-1) ?? "", /effort: high/);
+});
+
 test("sends local markdown images as native WeChat image messages", async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-bridge-"));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));

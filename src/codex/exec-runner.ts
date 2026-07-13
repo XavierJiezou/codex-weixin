@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -49,6 +49,8 @@ export type CodexRunResult = {
 };
 
 export class CodexExecRunner {
+  private readonly activeRuns: Array<{ child: ChildProcess; threadId?: string }> = [];
+
   constructor(private readonly options: CodexExecRunnerOptions = {}) {}
 
   run(input: BuildCodexExecArgsInput): Promise<CodexRunResult> {
@@ -65,6 +67,14 @@ export class CodexExecRunner {
         stdio: ["ignore", "pipe", "pipe"],
         shell: false
       });
+      const activeRun = { child, threadId: input.threadId };
+      this.activeRuns.push(activeRun);
+      const removeActiveRun = () => {
+        const index = this.activeRuns.indexOf(activeRun);
+        if (index >= 0) {
+          this.activeRuns.splice(index, 1);
+        }
+      };
       const timer = setTimeout(() => {
         child.kill();
         reject(new Error(`codex exec timed out after ${timeoutMs}ms`));
@@ -75,10 +85,12 @@ export class CodexExecRunner {
       child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
       child.on("error", (error) => {
         clearTimeout(timer);
+        removeActiveRun();
         reject(error);
       });
       child.on("close", (code) => {
         clearTimeout(timer);
+        removeActiveRun();
         const raw = Buffer.concat(stdout).toString("utf8");
         const err = Buffer.concat(stderr).toString("utf8");
         if (code !== 0) {
@@ -89,6 +101,19 @@ export class CodexExecRunner {
         resolve({ raw, text: parsed.text, threadId: parsed.threadId });
       });
     });
+  }
+
+  async stop(threadId?: string): Promise<void> {
+    const target = threadId
+      ? [...this.activeRuns].reverse().find((run) => run.threadId === threadId)
+      : this.activeRuns.at(-1);
+    target?.child.kill();
+  }
+
+  close(): void {
+    for (const run of this.activeRuns.splice(0)) {
+      run.child.kill();
+    }
   }
 }
 
@@ -104,13 +129,13 @@ export function formatCodexExecFailure(code: number | null, stderr: string): Err
   return new Error(base);
 }
 
-function resolveCodexCommand(codexBin: string): { command: string; argsPrefix: string[] } {
-  if (process.platform !== "win32") {
-    return { command: codexBin, argsPrefix: [] };
-  }
-
+export function resolveCodexCommand(codexBin: string): { command: string; argsPrefix: string[] } {
   if (/\.(?:js|mjs|cjs)$/i.test(codexBin)) {
     return { command: process.execPath, argsPrefix: [codexBin] };
+  }
+
+  if (process.platform !== "win32") {
+    return { command: codexBin, argsPrefix: [] };
   }
 
   const npmShim = process.env.CHAT_CODEX_BIN;

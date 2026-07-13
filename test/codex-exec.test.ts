@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildCodexExecArgs,
+  CodexExecRunner,
   extractFinalText,
   formatCodexExecFailure,
   parseCodexExecOutput
 } from "../src/codex/exec-runner.js";
+
+const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 test("builds codex exec arguments without an explicit sandbox", () => {
   assert.deepEqual(
@@ -73,4 +78,17 @@ test("extracts nested agent_message text and thread id from codex json output", 
     text: "我是 Codex，基于 GPT-5 的编程协作助手。",
     threadId: "019f2ac8-4d54-7970-9490-f6675d60286a"
   });
+});
+
+test("stops the active codex exec fallback process", async (t) => {
+  const runner = new CodexExecRunner({
+    codexBin: path.join(fixturesDir, "fake-codex-exec-hold.mjs"),
+    timeoutMs: 2_000
+  });
+  t.after(() => runner.close());
+
+  const run = runner.run({ prompt: "hold", cwd: fixturesDir });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await runner.stop();
+  await assert.rejects(run, /exited with code/i);
 });

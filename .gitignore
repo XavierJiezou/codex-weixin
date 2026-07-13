@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+output/
+.playwright-cli/
 .env
 .codex-weixin/
 *.log

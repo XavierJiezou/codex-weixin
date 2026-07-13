@@ -1,23 +1,42 @@
 {
   "name": "codex-weixin",
-  "version": "0.1.0",
-  "description": "Independent WeChat bridge for local OpenAI Codex sessions.",
+  "version": "0.2.0",
+  "description": "Local multi-account WeChat server for OpenAI Codex.",
   "license": "MIT",
   "author": "Xuechao Zou",
+  "homepage": "https://github.com/XavierJiezou/codex-weixin#readme",
+  "bugs": {
+    "url": "https://github.com/XavierJiezou/codex-weixin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XavierJiezou/codex-weixin.git"
+  },
+  "keywords": [
+    "codex",
+    "wechat",
+    "weixin",
+    "openai",
+    "bridge"
+  ],
   "type": "module",
   "bin": {
-    "codex-weixin": "./dist/cli/index.js"
+    "codex-weixin": "./dist/server/index.js"
   },
   "files": [
     "dist/",
     "README.md",
     "README.en.md",
+    "CHANGELOG.md",
     "LICENSE",
     "NOTICE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm run copy:web",
+    "copy:web": "node scripts/copy-web-assets.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "dev": "tsx src/server/index.ts",
+    "start": "node dist/server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx test/*.test.ts",
     "prepack": "npm run clean && npm run build"
@@ -26,13 +45,16 @@
     "node": ">=22"
   },
   "dependencies": {
-    "qrcode-terminal": "^0.12.0",
-    "ws": "^8.18.0",
+    "dompurify": "^3.4.12",
+    "lucide": "^0.468.0",
+    "marked": "^18.0.6",
+    "open": "^10.1.0",
+    "qrcode": "^1.5.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "@types/ws": "^8.5.13",
+    "@types/qrcode": "^1.5.5",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3"
   }

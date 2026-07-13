@@ -1,36 +1,38 @@
 # codex-weixin
 
+**Connect multiple personal WeChat accounts to a local OpenAI Codex installation.**
+
 [中文](./README.md) | **English**
 
-Independent WeChat bridge for local OpenAI Codex sessions.
-
-`codex-weixin` logs in to WeChat through the iLink bot protocol, receives private chat messages with long polling, routes them to local Codex, and sends replies back to WeChat.
+`codex-weixin` is a cross-platform, local-only WeChat service dedicated to Codex. Starting it opens a Web management page where users scan a WeChat QR code, manage accounts and workspaces, and switch Codex sessions.
 
 ```text
-WeChat private chat
-  <-> iLink HTTP/JSON
-  <-> codex-weixin local daemon
-  <-> codex app-server, with codex exec fallback
+Multiple WeChat accounts <-> codex-weixin <-> local Codex <-> allowed workspaces
 ```
 
-## Status
+It is not a general messaging gateway. The management page is never exposed to the LAN or public Internet.
 
-This is an early independent implementation. It is designed as a small, auditable core rather than a full desktop plugin:
+## Features
 
-- Private chat only
-- Local-first state under `~/.codex-weixin`
-- Codex app-server preferred, `codex exec --json` fallback for fresh turns
-- Optional `codexExecSandbox` configuration for `codex exec`; when omitted, Codex's own configuration is preserved
-- Pairing and workspace allowlist by default
-- Inbound images, files, videos, and voice/audio without transcription are downloaded to local `inbound/` storage; WeChat voice with transcription is passed to Codex as text first
-- Native outbound image/video/file actions: local files are sent through iLink `getuploadurl`, WeChat CDN upload, and native `sendmessage`
-- Codex Markdown local image/video/file links are extracted into send actions so `C:/...` paths are not returned as plain text links
+- Local Web management page bound to `127.0.0.1`.
+- Concurrent monitoring for multiple enabled WeChat accounts.
+- Local account remarks that replace generic account labels throughout the session UI.
+- Browser QR login with waiting, scanned, confirmed, and expired states.
+- Managed Codex sessions grouped by WeChat-account tabs: render Markdown history, continue from the Web page, create, rename, activate, reset, and delete.
+- Web session attachments: send one prompt with up to 10 files (50 MB total); uploads and files sent by Codex appear on the matching history message with playback, preview, and download controls.
+- Typing state: the matching Web session shows when a Codex turn started from WeChat or the Web page is still running.
+- Model settings loaded from Codex app-server, with model-specific reasoning-effort dropdowns and GPT-5.6 Sol, Terra, and Luna for the IkunCoding provider.
+- Account isolation for sender authorization, context tokens, workspaces, threads, and inbound files.
+- Deny-by-default sender authorization managed from the account page.
+- Persistent per-account sync cursors and message IDs prevent duplicate deliveries from producing two Codex replies.
+- WeChat private-chat text, transcribed voice, image, audio, video, and file input.
+- Text and local image, video, and file delivery back to WeChat.
 
 ## Requirements
 
 - Node.js `>=22`
 - Git
-- Codex CLI installed and authenticated:
+- An installed and authenticated Codex CLI
 
 ```bash
 npm install -g @openai/codex
@@ -38,83 +40,64 @@ codex --version
 codex
 ```
 
-## Install From Source
+## Install and start
 
 ```bash
 git clone https://github.com/XavierJiezou/codex-weixin.git
 cd codex-weixin
 npm install
 npm run build
+npm install -g .
+codex-weixin
 ```
 
-Run the built CLI:
+The service opens [http://127.0.0.1:8787](http://127.0.0.1:8787). To run without a global install:
 
 ```bash
-node dist/cli/index.js doctor
+npm start
 ```
 
-During development you can also use:
+## First connection
 
-```bash
-npx tsx src/cli/index.ts doctor
-```
+1. Open Settings and confirm the default and allowed Codex workspaces.
+2. Select Add WeChat, scan the QR code, and confirm in WeChat.
+3. Send any message to the connected account.
+4. Return to WeChat Accounts and allow the pending sender.
+5. Send the message again to start a Codex turn.
 
-## Quick Start
+Repeat the QR flow to add more accounts. Every account has its own monitor, sender authorization, inbound directory, and managed-session state. A failed account does not stop the others.
 
-1. Log in to WeChat:
+## Session management
 
-```bash
-npx tsx src/cli/index.ts login
-```
+The Sessions page manages conversations created and used by this server. It does not scan or take ownership of every Codex conversation created in other terminals.
 
-2. Start the bridge in a project directory:
+Selecting a session reads its user messages and final replies from Codex's own persisted thread. The Web composer can submit text and multiple files as one turn and continues that same thread, so context remains shared with later WeChat messages. Uploads are isolated by account and session under `~/.codex-weixin/inbound/`, with at most 10 files and 50 MB total per turn.
 
-```bash
-cd /absolute/path/to/project
-npx tsx /absolute/path/to/codex-weixin/src/cli/index.ts serve --cwd /absolute/path/to/project
-```
+The UI does not display `@im.bot`, `@im.wechat`, or Codex thread IDs. The first two are internal iLink routing identifiers, not profile names. Each account can have a local remark edited from the WeChat Accounts page; the remark is reused by session tabs, with `WeChat Account 1` used only as a fallback. The current QR and messaging APIs do not expose WeChat nicknames, avatars, or a profile lookup endpoint, so the page uses a default icon while retaining those identifiers only in local state for correct routing.
 
-3. Send a message to the bot in WeChat.
+- Each authorized WeChat account has one active session and may own multiple named sessions.
+- Activate chooses which Codex thread receives the sender's next message.
+- Reset clears the recorded thread so the next message starts fresh context.
+- Delete removes only the bridge record, not Codex's own history files.
+- `/new` creates a new managed session for the current sender.
 
-Unknown senders are not allowed immediately. The bridge replies with a pairing notice. For a trusted personal install you can explicitly allow your sender id:
-
-```bash
-npx tsx src/cli/index.ts access allow <sender-id@im.wechat>
-```
-
-Then send `/help` in WeChat.
-
-## CLI Commands
+## WeChat commands
 
 ```text
-codex-weixin login [--force]
-codex-weixin serve [--cwd <path>] [--account <id>] [--state-dir <path>]
-codex-weixin accounts
-codex-weixin status
-codex-weixin doctor
-codex-weixin access status
-codex-weixin access allow <wechat-sender-id>
-codex-weixin access remove <wechat-sender-id>
-codex-weixin send-text --to last|<wechat-sender-id> --message <text>
+/help                         Show commands
+/status                       Show session, workspace, thread, backend, effective model, and reasoning effort
+/bind <absolute-path>          Bind to an allowed workspace
+/new                          Create a new managed Codex session
+/prompt start                 Buffer multiple WeChat messages
+/prompt done                  Submit the buffer as one Codex turn
+/stop                         Interrupt the current Codex task
 ```
 
-## WeChat Commands
+Regular messages enter the active session. Images, files, videos, and voice/audio without transcription are saved under the account's inbound directory and added to the prompt by local path. WeChat voice transcription is preferred when available.
 
-```text
-/help                         show commands
-/status                       show current sender/workspace/thread/backend
-/bind <absolute-path>          bind this chat to an allowed workspace
-/new                          start a fresh Codex thread on next message
-/prompt start                 buffer several WeChat messages
-/prompt done                  submit buffered messages as one Codex turn
-/stop                         interrupt current app-server task when available
-```
+## Sending local files
 
-Normal text goes to the current Codex session. Images, files, videos, and voice/audio without transcription are first downloaded to local `~/.codex-weixin/inbound` storage and then added to the prompt by path; media sent between `/prompt start` and `/prompt done` is buffered too. If a WeChat voice message includes transcription text, only the transcription is passed to Codex so Codex does not try to decode `.silk` audio.
-
-## Action Blocks
-
-Codex can explicitly request host actions in its final reply:
+Codex can request local-file delivery in its final response:
 
 ````text
 ```codex-weixin-actions
@@ -123,118 +106,70 @@ Codex can explicitly request host actions in its final reply:
     { "type": "image", "path": "/absolute/path/chart.png" },
     { "type": "video", "path": "/absolute/path/demo.mp4" },
     { "type": "file", "path": "/absolute/path/report.pdf" }
-  ],
-  "control": [
-    { "type": "thread.reset" }
   ]
 }
 ```
 ````
 
-Only absolute paths are accepted. Ordinary prose paths are treated as text and are not sent automatically.
+Only absolute local paths are accepted. Native outbound types are `image`, `video`, and `file`; audio is sent as a regular file. Remote URLs are not uploaded as local files.
 
-### Images, Videos, and Files
+## Codex backend
 
-When Codex needs to send a local file to the WeChat user, the preferred output is the `codex-weixin-actions` block above. The bridge reads the local file, encrypts it with AES-128-ECB, uploads it to the WeChat CDN, and sends it as a native iLink message:
+The default `codexBackend` is `auto`. On the first Codex message, the service starts one persistent `codex app-server --stdio` process and uses the current `initialize`, `thread/*`, and `turn/*` protocol. New and resumed conversations prefer app-server; startup, handshake, or request failures automatically fall back to `codex exec` or `codex exec resume`.
 
-- `type: "image"` sends a WeChat image
-- `type: "video"` sends a WeChat video
-- `type: "file"` sends a WeChat file
-- paths must be absolute local paths
+WeChat does not currently expose Codex approval prompts, so app-server uses `approvalPolicy: "never"` and operates only within the configured Codex sandbox instead of waiting for an approval that cannot be answered in WeChat. The management page can still pin the backend to `app-server` or `exec` for diagnostics.
 
-For compatibility with occasional Codex Markdown output, the bridge also converts local Markdown links like these into native send actions:
+## Models and reasoning effort
 
-```markdown
-![chart.png](C:/Users/me/Downloads/chart.png)
-[demo.mp4](C:/Users/me/Desktop/demo.mp4)
-[report.pdf](C:/Users/me/Downloads/report.pdf)
-```
+The Settings page loads available models and model-specific reasoning efforts from Codex app-server. Leaving a field on "Use Codex settings" preserves the Codex configuration; choosing and saving an explicit value applies it to later Web and WeChat turns.
 
-Remote URLs are not treated as local files.
+The IkunCoding provider also exposes `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. These options remain available after switching to another model. Send `/status` in WeChat to inspect the effective model and reasoning effort.
 
-## Runtime State
+## Local data
 
-Default location:
+Service state and the default Codex workspace share this directory:
 
 ```text
 ~/.codex-weixin/
-  accounts/       WeChat bot tokens
-  config.json     bridge config
-  state.json      sender bindings, context tokens, paired senders
-  inbound/        downloaded WeChat files/images
+  accounts/                 One credential file per WeChat account
+  runtime/<account-id>/     Sender authorization and managed sessions
+  inbound/<account-id>/     Inbound WeChat attachments
+  config.json               Codex and workspace configuration
   logs/
 ```
 
-Do not commit or share this directory.
+Do not commit or share this directory. The management API never returns WeChat tokens to the browser.
 
-Common Codex fields in `config.json`:
+## Startup settings
 
-```json
-{
-  "codexBin": "codex",
-  "codexBackend": "auto"
-}
+The server always binds to `127.0.0.1`. Environment variables can change its port and state directory or disable automatic browser opening:
+
+```text
+CODEX_WEIXIN_PORT=8787
+CODEX_WEIXIN_STATE_DIR=/absolute/private/path
+CODEX_WEIXIN_OPEN=0
 ```
 
-`codexExecSandbox` only affects calls where `codexBackend` is `exec`, or where `auto` falls back to `exec`. Valid values are `read-only`, `workspace-write`, and `danger-full-access`. Omitting the field preserves Codex's own configuration.
+## Security model
 
-If a Windows background service reports `CreateProcessAsUserW failed: 1312`, and you accept giving Codex full access to the machine, add this setting and restart the service:
-
-```json
-{
-  "codexExecSandbox": "danger-full-access"
-}
-```
-
-Do not treat this as a harmless compatibility switch.
-
-## Security Model
-
-`codex-weixin` lets WeChat remotely control a local Codex process. Treat it like remote shell access with guardrails:
-
-- Unknown senders are denied by default.
-- Workspaces must be allowlisted.
-- `/bind` only accepts absolute paths under allowed workspaces.
-- Generated files are sent only through explicit action blocks, local absolute Markdown links, or local CLI commands.
-- Credentials stay local under `~/.codex-weixin/accounts`.
-- `danger-full-access` bypasses the Codex filesystem sandbox. The workspace allowlist still constrains `/bind`, but it no longer constrains which local paths Codex commands can access.
-
-Recommended first run:
-
-```bash
-codex-weixin serve --cwd /your/project
-codex-weixin access allow <your-wechat-sender-id>
-```
+- Non-local Host and Origin values are rejected.
+- Every mutating API call requires an in-memory page token.
+- WeChat credentials never reach the management page.
+- Unknown senders are denied until explicitly allowed.
+- `/bind` accepts only absolute paths under the workspace allowlist.
+- `danger-full-access` bypasses the Codex filesystem sandbox and must be enabled only when full-machine access is acceptable.
+- Concurrent accounts share local compute resources and Codex quotas.
 
 ## Development
 
 ```bash
 npm install
+npm run dev
 npm test
 npm run typecheck
 npm run build
 ```
 
-The test suite covers core behavior:
+The project is a clean-room independent implementation under the MIT License. Its iLink integration shape references `Tencent/openclaw-weixin`, along with public Codex/WeChat projects for app-server, media-transfer, and security-boundary practices. No AGPL source code was copied.
 
-- pairing and allowlist access
-- explicit action block parsing and local Markdown link extraction
-- prompt buffering
-- iLink login, polling, message, typing, and stale context behavior
-- AES-128-ECB media helpers, inbound image/file/video/audio download, and outbound image/video/file upload delivery
-- Codex exec invocation shape
-
-## References
-
-This project is an independent implementation informed by the public WeChat/Codex bridge ecosystem, especially:
-
-- `Tencent/openclaw-weixin` for iLink channel shape and MIT-licensed protocol organization
-- `codex-wechat-plugin`, `CodexBridge`, and `CLI-WeChat-Bridge` for Codex app-server oriented design
-- `wechat-acp` and `wechat-ai-bridge` for file ingress and prompt buffering ideas
-- `codex-wechat-connector` and `codex-wechat-handoff` for explicit action blocks and local safety boundaries
-
-AGPL-licensed project source is not copied.
-
-## License
-
-MIT
+See [CHANGELOG.md](./CHANGELOG.md) for release history.

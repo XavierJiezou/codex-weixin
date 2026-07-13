@@ -19,6 +19,7 @@ export type BridgeServiceOptions = {
   runner?: HybridCodexRunner;
   inboundDir?: string;
   mediaFetch?: FetchLike;
+  onTurnStatus?: (status: { senderId: string; sessionId: string; active: boolean }) => void;
 };
 
 export class BridgeService {
@@ -53,6 +54,7 @@ export class BridgeService {
       return;
     }
     this.options.stateStore.setPairedSenderIds(this.access.listPairedSenderIds());
+    this.options.stateStore.ensureActiveSession(message.senderId, this.options.config.defaultCwd);
 
     const command = parseCommand(message.text);
     if (command) {
@@ -80,14 +82,14 @@ export class BridgeService {
         return;
       case "status":
       case "where":
-        await this.reply(message.senderId, this.statusText(message.senderId));
+        await this.reply(message.senderId, await this.statusText(message.senderId));
         return;
       case "bind":
         await this.bindWorkspace(message.senderId, command.arg);
         return;
       case "new":
-        this.options.stateStore.setThread(message.senderId, "");
-        await this.reply(message.senderId, "Next message will start a fresh Codex thread.");
+        this.options.stateStore.createSession(message.senderId, this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd);
+        await this.reply(message.senderId, "Created a new Codex session for the next message.");
         return;
       case "prompt":
         await this.handlePromptCommand(message.senderId, command.arg);
@@ -169,31 +171,37 @@ export class BridgeService {
   }
 
   private async runCodexTurn(message: NormalizedWeixinMessage, text: string, attachments: PromptBufferItem[] = []): Promise<void> {
+    const session = this.options.stateStore.ensureActiveSession(message.senderId, this.options.config.defaultCwd);
     const workspace = this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd;
     const threadId = this.options.stateStore.getThread(message.senderId) || undefined;
-    await this.withTyping(message.senderId, async () => {
-      console.log(`[codex-weixin] starting Codex turn for ${message.senderId} in ${workspace}`);
-      const result = await this.runner.run({
-        prompt: buildPrompt(text, attachments),
-        cwd: workspace,
-        threadId,
-        model: this.options.config.model,
-        effort: this.options.config.effort
-      });
-      console.log(`[codex-weixin] Codex turn completed for ${message.senderId}; text=${result.text.length} chars`);
-      if (result.threadId) {
-        this.options.stateStore.setThread(message.senderId, result.threadId);
-      }
-      const parsed = parseActionBlocks(result.text);
-      if (parsed.visibleText.trim()) {
-        for (const chunk of chunkText(parsed.visibleText)) {
-          await this.reply(message.senderId, chunk);
+    this.options.onTurnStatus?.({ senderId: message.senderId, sessionId: session.id, active: true });
+    try {
+      await this.withTyping(message.senderId, async () => {
+        console.log(`[codex-weixin] starting Codex turn for ${message.senderId} in ${workspace}`);
+        const result = await this.runner.run({
+          prompt: buildPrompt(text, attachments),
+          cwd: workspace,
+          threadId,
+          model: this.options.config.model,
+          effort: this.options.config.effort
+        });
+        console.log(`[codex-weixin] Codex turn completed for ${message.senderId}; text=${result.text.length} chars`);
+        if (result.threadId) {
+          this.options.stateStore.setThread(message.senderId, result.threadId);
         }
-      }
-      for (const action of parsed.actions.send) {
-        await this.sendLocalMedia(message.senderId, action);
-      }
-    });
+        const parsed = parseActionBlocks(result.text);
+        if (parsed.visibleText.trim()) {
+          for (const chunk of chunkText(parsed.visibleText)) {
+            await this.reply(message.senderId, chunk);
+          }
+        }
+        for (const action of parsed.actions.send) {
+          await this.sendLocalMedia(message.senderId, action);
+        }
+      });
+    } finally {
+      this.options.onTurnStatus?.({ senderId: message.senderId, sessionId: session.id, active: false });
+    }
   }
 
   private async sendLocalMedia(senderId: string, action: { type: "image" | "file" | "video"; path: string }): Promise<void> {
@@ -235,16 +243,25 @@ export class BridgeService {
     }
   }
 
-  private statusText(senderId: string): string {
+  private async statusText(senderId: string): Promise<string> {
+    const session = this.options.stateStore.getActiveSession(senderId);
+    const workspace = session?.workspace ?? this.options.config.defaultCwd;
+    let runtime: { model?: string; effort?: string } = {};
+    try {
+      runtime = await this.runner.getRuntimeInfo(workspace, session?.threadId);
+    } catch (error) {
+      console.warn(`Codex runtime info unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
     return [
       "codex-weixin status",
       `sender: ${senderId}`,
-      `workspace: ${this.options.stateStore.getWorkspace(senderId) ?? this.options.config.defaultCwd}`,
-      `thread: ${this.options.stateStore.getThread(senderId) || "(new)"}`,
+      `session: ${session?.title ?? "(new)"}`,
+      `workspace: ${workspace}`,
+      `thread: ${session?.threadId || "(new)"}`,
       `backend: ${this.options.config.codexBackend}`,
       `exec sandbox: ${this.options.config.codexExecSandbox ?? "(Codex default)"}`,
-      `model: ${this.options.config.model ?? "(default)"}`,
-      `effort: ${this.options.config.effort ?? "(default)"}`
+      `model: ${this.options.config.model ?? runtime.model ?? "(Codex default)"}`,
+      `effort: ${this.options.config.effort ?? runtime.effort ?? "(Codex default)"}`
     ].join("\n");
   }
 
@@ -261,6 +278,20 @@ export class BridgeService {
       }
       throw error;
     }
+  }
+
+  allowSender(senderId: string): void {
+    this.access.allow(senderId);
+    this.options.stateStore.setPairedSenderIds(this.access.listPairedSenderIds());
+  }
+
+  removeSender(senderId: string): void {
+    this.access.remove(senderId);
+    this.options.stateStore.setPairedSenderIds(this.access.listPairedSenderIds());
+  }
+
+  listAllowedSenders(): string[] {
+    return this.access.listPairedSenderIds();
   }
 }
 
@@ -279,9 +310,9 @@ function helpText(): string {
     "/help - show commands",
     "/status - show current binding",
     "/bind <absolute-path> - bind this chat to a workspace",
-    "/new - start a fresh Codex thread on next message",
+    "/new - create a new managed Codex session",
     "/prompt start - buffer multiple WeChat messages",
     "/prompt done - submit buffered prompt",
-    "/stop - interrupt current app-server task"
+    "/stop - interrupt the current Codex task"
   ].join("\n");
 }

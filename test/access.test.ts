@@ -3,16 +3,16 @@ import test from "node:test";
 
 import { AccessController } from "../src/bridge/access.js";
 
-test("unknown users require a local pairing approval before control is allowed", () => {
+test("unknown users require approval from the local management page", () => {
   const access = new AccessController({ allowedSenderIds: [] });
 
   const challenge = access.requireAccess("alice@im.wechat");
 
   assert.equal(challenge.allowed, false);
-  assert.match(challenge.message, /pairing code/i);
+  assert.match(challenge.message, /management page/i);
   assert.equal(access.isAllowed("alice@im.wechat"), false);
 
-  access.pair(challenge.code);
+  access.allow("alice@im.wechat");
 
   assert.equal(access.isAllowed("alice@im.wechat"), true);
 });

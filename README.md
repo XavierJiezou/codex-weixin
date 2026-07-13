@@ -1,64 +1,39 @@
 <h1 align="center">codex-weixin</h1>
 
 <p align="center">
-  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="520" />
+  <strong>把多个个人微信账号接入本机 OpenAI Codex。</strong>
 </p>
 
 <p align="center">
   <strong>中文</strong> | <a href="./README.en.md">English</a>
 </p>
 
-<p align="center">
-  <strong>把微信变成本机 OpenAI Codex 的随身入口。</strong>
-</p>
-
-<p align="center">
-  在微信里发文字、语音、图片、音频、视频或文件，<code>codex-weixin</code> 会把消息交给本机 Codex 处理，再把回复和生成的附件发回微信。
-</p>
-
-<p align="center">
-  <code>微信私聊 &lt;-&gt; codex-weixin 本地服务 &lt;-&gt; 本机 Codex &lt;-&gt; 你的项目目录</code>
-</p>
-
-<p align="center">
-  当前版本面向微信个人号私聊和自用场景，默认启用 sender allowlist 和 workspace allowlist。微信群聊/多人机器人能力受微信开放能力限制，暂不作为目标能力。
-</p>
-
-## 功能状态
-
-截图统一建议放在 `docs/images/screenshots/`。表格里的路径就是每项功能预留的截图位置。状态符号：✅ 已支持，☑️ 已支持但默认关闭，⬜ 待办。
-
-| 状态 | 功能 | 说明 | 截图位置 |
-| --- | --- | --- | --- |
-| ✅ | 微信私聊文本指令 | 直接发送文字即可让 Codex 看代码、改文件、解释报错或回答问题。 | 待补：`docs/images/screenshots/text-command.png` |
-| ✅ | 顶部“对方正在输入...” | Codex 长时间思考时持续发送 typing 状态，避免看起来像服务停住了。 | 待补：`docs/images/screenshots/typing.png` |
-| ✅ | 微信语音指令 | 有微信转写文本时按文字处理；无转写时下载为音频附件交给 Codex。 | 待补：`docs/images/screenshots/voice-command.png` |
-| ✅ | 多媒体内容理解 | 图片、音频、视频、文件会保存到本机，并以本地路径加入 prompt。 | 待补：`docs/images/screenshots/media-understanding.png` |
-| ✅ | `/prompt start` / `/prompt done` | 适合把多条文字、语音、图片、文件打包成一次 Codex 请求。 | 待补：`docs/images/screenshots/prompt-buffer.png` |
-| ✅ | 多媒体双向传输 | 微信可发媒体给 Codex；Codex 可回传本机图片、视频和文件，音频按文件发送。 | 待补：`docs/images/screenshots/media-transfer.png` |
-| ✅ | `/new` 新建会话 | 下一条消息开启新的 Codex thread，不继续沿用上一轮上下文。 | 待补：`docs/images/screenshots/new-thread.png` |
-| ☑️ | Codex 思考过程转发 | 可把 Codex 中间思考过程转发到微信；默认关闭，避免刷屏。 | 待补：`docs/images/screenshots/thinking-trace.png` |
-| ✅ | `/stop` 中断任务 | app-server 可用时，尝试中断当前 Codex 任务。 | 待补：`docs/images/screenshots/stop-task.png` |
-| ✅ | 权限和工作区绑定 | 未知 sender 默认拒绝；`/bind` 只允许绑定 allowlist 内的工作区。 | 待补：`docs/images/screenshots/access-bind.png` |
-| ✅ | Codex exec sandbox 配置 | 可通过 `codexExecSandbox` 显式设置 `codex exec` sandbox；未设置时沿用 Codex 自身配置。 | 待补：`docs/images/screenshots/exec-sandbox.png` |
-| ⬜ | 带中间过程的流式消息回复 | 让 Codex 回复边生成边分段推送，而不是只等最终答案。 | 待补：`docs/images/screenshots/streaming-reply.png` |
-| ⬜ | 一个 Codex 接多个微信账号 | 同一个本地 Codex 服务同时服务多个微信登录账号。 | 待补：`docs/images/screenshots/multi-wechat-accounts.png` |
-| ⬜ | 微信端切换 Codex 模型 | 在微信里通过命令选择或切换 Codex 模型。 | 待补：`docs/images/screenshots/model-switch.png` |
-
-## 快速开始
-
-推荐直接把本项目链接交给你正在使用的 agent 工具，让它自己安排安装、配置和启动：
+`codex-weixin` 是一个跨平台、本机运行的微信到 Codex 专用服务。启动后会打开 Web 管理页；用户在页面扫码登录微信，即可从微信私聊控制本机 Codex、管理工作目录和切换会话。
 
 ```text
-请参考 https://github.com/XavierJiezou/codex-weixin
-帮我在这台电脑上安装并配置 codex-weixin，把本机 Codex 接入微信。
-请检查 Node.js、Git 和 Codex CLI 登录状态，克隆/构建项目，引导我完成微信扫码登录，
-配置 sender allowlist 与 workspace allowlist，并启动服务。
+多个微信账号 <-> codex-weixin <-> 本机 Codex <-> 允许的工作目录
 ```
 
-agent 工具会根据当前机器环境自行执行 `doctor`、`login`、`serve`、`status` 和 `access allow` 等步骤；需要扫码或确认权限时，按它的提示操作即可。下面命令仅作为手动安装或排障参考。
+它不是通用消息网关，不接入其他聊天平台，也不把管理页面开放到局域网或公网。
 
-### 手动环境检查
+## 功能
+
+- 本机 Web 管理页：固定监听 `127.0.0.1`。
+- 多微信账号：一个服务并行运行多个已启用账号。
+- 本机账号备注：可给每个微信账号设置自定义名称，并同步显示在会话标签中。
+- 网页扫码：显示等待扫码、已扫码、已连接和过期状态。
+- 会话管理：按微信账号标签分类，查看带 Markdown 渲染的历史消息，并可在 Web 页面继续同一个 Codex thread；同时支持新建、重命名、切换、重置和删除。
+- Web 会话附件：可随提示词一次上传最多 10 个文件（合计 50 MB）；上传文件与 Codex 已发送到微信的视频、图片和文件都会显示在对应历史消息中，支持播放、预览和下载。
+- 输入状态：微信或 Web 发起 Codex turn 时，对应 Web 会话会显示“对方正在输入…”。
+- 模型设置：从 Codex app-server 读取模型和推理强度，并在设置页通过下拉列表切换；IkunCoding 提供方支持 GPT-5.6 Sol、Terra 和 Luna。
+- 会话隔离：不同微信账号和联系人拥有独立 sender、context token、workspace 和 thread。
+- 联系人授权：未知联系人默认拒绝，可在账号页面允许或撤销。
+- 消息去重：按微信账号持久记录同步游标和消息 ID，防止重复投递触发两次 Codex 回复。
+- 微信私聊文本、语音转写、图片、音频、视频和文件入站。
+- Codex 回复文本以及本机图片、视频和文件回传微信。
+- `/new`、`/bind`、`/prompt start`、`/prompt done` 和 `/stop`。
+
+## 环境要求
 
 - Node.js `>=22`
 - Git
@@ -70,195 +45,152 @@ codex --version
 codex
 ```
 
-### 手动源码安装
+## 安装
 
 ```bash
 git clone https://github.com/XavierJiezou/codex-weixin.git
 cd codex-weixin
 npm install
 npm run build
-node dist/cli/index.js doctor
+npm install -g .
 ```
 
-开发时也可以直接运行 TypeScript：
+启动服务：
 
 ```bash
-npx tsx src/cli/index.ts doctor
+codex-weixin
 ```
 
-如果 Windows PowerShell 遇到 `npm.ps1` 执行策略问题，可以把 `npm` 换成 `npm.cmd`。
-
-## 第一次启动
-
-通常不需要手动照着下面一步步执行。把 GitHub 链接交给 agent 工具后，它可以自行完成登录、启动、sender 授权和 workspace 绑定；下面流程主要用于你想手动操作或排查问题时参考。
-
-1. 微信扫码登录：
+服务会自动打开 [http://127.0.0.1:8787](http://127.0.0.1:8787)。如果不希望全局安装，也可以在项目目录运行：
 
 ```bash
-npx tsx src/cli/index.ts login
+npm start
 ```
 
-2. 在你希望 Codex 操作的项目目录启动服务：
+## 第一次接入微信
 
-```bash
-cd /absolute/path/to/project
-npx tsx /absolute/path/to/codex-weixin/src/cli/index.ts serve --cwd /absolute/path/to/project
-```
+1. 打开管理页，在“设置”中确认 Codex 默认工作目录和允许的工作目录。
+2. 点击“添加微信”，使用微信扫描页面二维码并确认登录。
+3. 在微信中给新接入的账号发送任意消息。
+4. 回到“微信账号”，允许页面中出现的待授权联系人。
+5. 再次从微信发送消息，Codex 会在默认工作目录中开始处理。
 
-3. 在微信里给 bot 发送：
+继续添加账号时重复扫码即可。每个账号都有独立的轮询任务、联系人授权、入站文件和会话状态；单个账号发生错误不会停止其他账号。
 
-```text
-/help
-```
+## 会话管理
 
-如果收到 `Access denied`，先在本地终端查看最近的 sender：
+“会话”页面只管理由本服务创建和使用的 Codex 会话，不扫描或接管其他终端产生的全部 Codex 历史记录。
 
-```bash
-npx tsx src/cli/index.ts status
-```
+选择一个会话后，右侧会从 Codex 自身保存的 thread 中读取历史用户消息和最终回复。可以直接在页面底部继续聊天，并通过回形针按钮将文本提示词和多个文件作为同一个 turn 发送；Web 和微信共用同一个 thread，上下文会保持连续。上传文件按微信账号和会话隔离保存在 `~/.codex-weixin/inbound/`，每次最多 10 个、合计不超过 50 MB。
 
-复制 `lastActiveSenderId`，然后允许这个微信发送者：
+页面不显示 `@im.bot`、`@im.wechat` 和 Codex thread id。前两者是微信 iLink 用于账号、联系人路由的内部标识，并不是昵称。可以在“微信账号”页面给账号设置只保存在本机的备注；备注会同步用于会话标签。未设置备注时才使用“微信账号 1”这类默认名称。当前扫码和消息接口没有提供微信昵称、头像或个人资料查询能力，因此页面使用默认图标；这些内部标识仍只在本机状态文件中保存，以保证消息能投递到正确账号和联系人。
 
-```bash
-npx tsx src/cli/index.ts access allow <sender-id@im.wechat>
-```
-
-再次发送 `/help`，能看到命令列表就说明桥接可用。
+- 每个已授权微信账号有一个当前活动会话，也可以拥有多个命名会话。
+- “切换”决定该联系人下一条微信消息继续哪个 Codex thread。
+- “重置”清空本服务记录的 thread，下一条消息创建新上下文。
+- “删除”只删除本服务中的会话记录，不删除 Codex 自身保存的历史文件。
+- 微信中的 `/new` 会立即为当前联系人创建新的受管会话。
 
 ## 微信内命令
 
 ```text
 /help                         查看命令
-/status                       查看当前 sender、workspace、thread 和 backend
-/bind <absolute-path>          将当前微信聊天绑定到允许的 workspace
-/new                          下一条消息开始新的 Codex thread
+/status                       查看当前会话、工作目录、thread、backend、实际模型和推理强度
+/bind <absolute-path>          绑定到允许列表内的工作目录
+/new                          创建新的受管 Codex 会话
 /prompt start                 开始缓冲多条微信消息
 /prompt done                  将缓冲内容作为一次 Codex turn 提交
-/stop                         在可用时中断当前 app-server 任务
+/stop                         中断当前 Codex 任务
 ```
 
-普通文本会直接进入当前 Codex 会话。图片、文件、视频和无转写语音/音频会先下载到 `~/.codex-weixin/inbound`，再以本地路径加入 prompt。微信语音如果带转写文本，会优先使用转写文本，避免 Codex 再尝试解码 `.silk` 音频。
+普通消息直接进入当前活动会话。图片、文件、视频和无转写语音会先保存到账号独立的入站目录，再以本地路径加入 prompt；有微信转写文本的语音优先使用转写文本。
 
-## 多媒体回传
+## 文件回传
 
-推荐让 Codex 在最终回复里声明要发送的本机文件：
+Codex 可以在最终回复中声明需要发送的本机文件：
 
 ````text
 ```codex-weixin-actions
 {
   "send": [
-    { "type": "image", "path": "C:/absolute/path/chart.png" },
-    { "type": "video", "path": "C:/absolute/path/demo.mp4" },
-    { "type": "file", "path": "C:/absolute/path/report.pdf" }
+    { "type": "image", "path": "/absolute/path/chart.png" },
+    { "type": "video", "path": "/absolute/path/demo.mp4" },
+    { "type": "file", "path": "/absolute/path/report.pdf" }
   ]
 }
 ```
 ````
 
-也兼容本地 Markdown 链接：
+只接受本机绝对路径。原生出站类型为 `image`、`video` 和 `file`；音频按普通文件发送。远程 URL 不会被当作本机文件上传。
 
-```markdown
-![chart.png](C:/Users/me/Downloads/chart.png)
-[demo.mp4](C:/Users/me/Desktop/demo.mp4)
-[report.pdf](C:/Users/me/Downloads/report.pdf)
-```
+## Codex 后端
 
-注意：
+默认的 `codexBackend` 是 `auto`。第一次收到 Codex 消息时，服务会启动一个持久的 `codex app-server --stdio` 进程，并使用新版 `initialize`、`thread/*` 和 `turn/*` 协议。新会话和已有会话都优先通过 app-server 运行；如果 app-server 无法启动、握手或处理请求，会自动回退到 `codex exec` 或 `codex exec resume`。
 
-- 只接受本机绝对路径。
-- 远程 URL 不会被当成本地文件上传。
-- 原生出站类型是 `image`、`video`、`file`；音频可以作为 `file` 发出。
+微信端目前没有 Codex 审批弹窗，因此 app-server 使用 `approvalPolicy: "never"`，只在现有 Codex sandbox 权限内执行，不会等待一个无法在微信中回答的本机审批请求。管理页仍可把后端固定为 `app-server` 或 `exec`，用于排查问题。
 
-## 本地 CLI
+## 模型和推理强度
 
-```text
-codex-weixin login [--force]
-codex-weixin serve [--cwd <path>] [--account <id>] [--state-dir <path>]
-codex-weixin accounts
-codex-weixin status
-codex-weixin doctor
-codex-weixin access status
-codex-weixin access allow <wechat-sender-id>
-codex-weixin access remove <wechat-sender-id>
-codex-weixin send-text --to last|<wechat-sender-id> --message <text>
-```
+“设置”页面会从 Codex app-server 读取可用模型和各模型支持的推理强度。选择“沿用 Codex 设置”时使用 Codex 自身配置；选择具体模型或推理强度并保存后，后续 Web 和微信消息都会使用该配置。
 
-## 本地状态
+IkunCoding 提供方会额外显示 `gpt-5.6-sol`、`gpt-5.6-terra` 和 `gpt-5.6-luna`。切换到其他模型后，这三项仍会保留在下拉列表中。微信发送 `/status` 可以查看当前生效的模型和推理强度。
 
-默认保存在：
+## 本地数据
+
+服务状态和默认 Codex 工作目录统一放在：
 
 ```text
 ~/.codex-weixin/
-  accounts/       微信 bot token
-  config.json     桥接配置
-  state.json      sender 绑定、context token、已允许 sender
-  inbound/        微信发来的图片、视频、音频和文件
+  accounts/                 微信账号凭据，每个账号一个文件
+  runtime/<account-id>/     联系人授权和受管会话状态
+  inbound/<account-id>/     微信入站附件
+  config.json               Codex 和工作区配置
   logs/
 ```
 
-不要提交或分享这个目录。里面可能包含微信凭证、本地路径和你发过来的附件。
+不要提交或分享该目录。管理 API 不会把微信 token 返回给浏览器。
 
-## Codex exec sandbox
+## 启动设置
 
-`config.json` 中常用的 Codex 字段：
+服务始终只绑定 `127.0.0.1`。可以通过环境变量改变端口、状态目录或关闭自动打开浏览器：
 
-```json
-{
-  "codexBin": "codex",
-  "codexBackend": "auto"
-}
+```text
+CODEX_WEIXIN_PORT=8787
+CODEX_WEIXIN_STATE_DIR=/absolute/private/path
+CODEX_WEIXIN_OPEN=0
 ```
 
-`codexExecSandbox` 只影响 `codexBackend` 为 `exec`，或 `auto` 回退到 `exec` 时的调用。可选值为 `read-only`、`workspace-write`、`danger-full-access`；省略该字段时沿用 Codex 自身配置。
+Windows PowerShell 示例：
 
-如果 Windows 后台服务报错 `CreateProcessAsUserW failed: 1312`，并且你接受 Codex 获得整机访问权限的风险，可以添加以下配置后重启服务：
-
-```json
-{
-  "codexExecSandbox": "danger-full-access"
-}
+```powershell
+$env:CODEX_WEIXIN_OPEN="0"
+codex-weixin
 ```
-
-不要仅为消除报错而忽略这个权限变化。
 
 ## 安全边界
 
-- 未知 sender 默认拒绝。
-- workspace 必须在 allowlist 内。
-- `/bind` 只接受允许 workspace 下的绝对路径。
-- 生成文件只有在明确动作块、本地绝对 Markdown 链接或本地 CLI 命令中才会发送。
-- 微信凭证只保存在本机 `~/.codex-weixin/accounts`。
-- `danger-full-access` 会绕过 Codex 的文件系统 sandbox；workspace allowlist 仍限制 `/bind`，但不再限制 Codex 命令可访问的本机路径。
-
-个人自用时，推荐在可信项目目录启动：
-
-```bash
-codex-weixin serve --cwd /your/project
-codex-weixin access allow <your-wechat-sender-id>
-```
+- Web 服务只监听本机，拒绝非本机 Host 和 Origin。
+- 所有修改 API 都需要页面运行时临时令牌。
+- 微信凭据永远不返回管理页面。
+- 未知联系人默认拒绝，必须在管理页明确允许。
+- `/bind` 只能选择允许列表内的绝对工作目录。
+- `danger-full-access` 会绕过 Codex 文件系统 sandbox；只有接受整机访问风险时才启用。
+- 多账号可以并行触发 Codex，会共同占用本机 CPU、内存和 Codex 配额。
 
 ## 开发
 
 ```bash
 npm install
+npm run dev
 npm test
 npm run typecheck
 npm run build
 ```
 
-当前测试覆盖 sender 配对、workspace allowlist、微信消息归一化、prompt buffering、iLink 登录/轮询/发送、typing、入站媒体下载、出站媒体上传、Codex runner 参数和动作块解析。
+开发入口同样只启动本机 Web 服务。浏览器页面、JSON API、多账号运行时、扫码状态机和受管会话都有自动化测试。
 
-## 参考
+## 参考与许可
 
-本项目是独立实现，设计时参考了公开的微信/Codex 桥接生态，尤其是：
+项目是独立实现，微信 iLink 接入形态参考 `Tencent/openclaw-weixin`，并参考了公开的 Codex/微信桥接项目在 Codex app-server、媒体传输和安全边界方面的实践。项目未复制 AGPL 项目源码，使用 MIT License。
 
-- `Tencent/openclaw-weixin`：iLink channel 形态和 MIT 协议组织方式
-- `codex-wechat-plugin`、`CodexBridge`、`CLI-WeChat-Bridge`：Codex app-server 主路径设计
-- `wechat-acp`、`wechat-ai-bridge`：文件入站和 prompt buffering 思路
-- `codex-wechat-connector`、`codex-wechat-handoff`：显式动作块和本地安全边界
-
-没有复制 AGPL 项目源码。
-
-## License
-
-MIT
+版本变更见 [CHANGELOG.md](./CHANGELOG.md)。

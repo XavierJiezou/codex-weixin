@@ -6,6 +6,9 @@ export type MonitorOptions = {
   signal?: AbortSignal;
   pollIntervalMs?: number;
   maxPollRetryMs?: number;
+  initialSyncKey?: string;
+  onSyncKey?: (syncKey: string) => Promise<void> | void;
+  claimMessage?: (message: NormalizedWeixinMessage) => boolean;
   onMessage: (message: NormalizedWeixinMessage) => Promise<void>;
   onMessageError?: (error: unknown, message: NormalizedWeixinMessage) => Promise<void> | void;
 };
@@ -33,13 +36,17 @@ export class PollRetryBackoff {
 }
 
 export async function monitorWeixin(options: MonitorOptions): Promise<void> {
-  let syncKey: string | undefined;
+  let syncKey = options.initialSyncKey;
   const pollIntervalMs = options.pollIntervalMs ?? 1000;
   const retryBackoff = new PollRetryBackoff(pollIntervalMs, options.maxPollRetryMs ?? 30_000);
   while (!options.signal?.aborted) {
     let batch: { syncKey?: string; messages: WeixinRawMessage[] };
     try {
-      batch = parseUpdateBatch(await options.client.getUpdates(syncKey));
+      batch = parseUpdateBatch(await options.client.getUpdates(syncKey, options.signal));
+      if (batch.syncKey && batch.syncKey !== syncKey) {
+        syncKey = batch.syncKey;
+        await options.onSyncKey?.(syncKey);
+      }
     } catch (error) {
       const retryMs = retryBackoff.next();
       console.error(`[codex-weixin] monitor poll failed; retrying in ${retryMs}ms: ${errorDetail(error)}`);
@@ -47,7 +54,6 @@ export async function monitorWeixin(options: MonitorOptions): Promise<void> {
       continue;
     }
     retryBackoff.reset();
-    syncKey = batch.syncKey ?? syncKey;
     const { messages } = batch;
     if (messages.length) {
       console.log(`[codex-weixin] received ${messages.length} update(s)`);
@@ -61,6 +67,10 @@ export async function monitorWeixin(options: MonitorOptions): Promise<void> {
         continue;
       }
       if (!normalized) {
+        continue;
+      }
+      if (options.claimMessage && !options.claimMessage(normalized)) {
+        console.log(`[codex-weixin] skipped duplicate message ${normalized.id} from ${normalized.senderId}`);
         continue;
       }
       try {

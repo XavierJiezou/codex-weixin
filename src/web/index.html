@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>codex-weixin</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/vendor/lucide.min.js"></script>
+  <script defer src="/vendor/marked.umd.js"></script>
+  <script defer src="/vendor/purify.min.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="#accounts" aria-label="codex-weixin 首页">
+        <span class="brand-mark" aria-hidden="true">
+          <i data-lucide="terminal-square"></i>
+          <i data-lucide="message-circle"></i>
+        </span>
+        <span class="brand-name">codex-weixin</span>
+      </a>
+      <nav class="view-tabs" aria-label="管理视图">
+        <button class="tab is-active" type="button" data-view="accounts">微信账号</button>
+        <button class="tab" type="button" data-view="sessions">会话</button>
+        <button class="tab" type="button" data-view="settings">设置</button>
+      </nav>
+      <button class="button button-primary header-action" id="addAccountButton" type="button" title="添加微信" aria-label="添加微信">
+        <i data-lucide="scan-line"></i>
+        <span>添加微信</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="status-band" aria-label="服务概览">
+      <div class="status-inner">
+        <div class="service-state"><span class="pulse-dot" id="serviceDot"></span><span id="serviceStateText">正在检查 Codex</span></div>
+        <dl class="metrics">
+          <div><dt>运行账号</dt><dd id="runningAccountMetric">0</dd></div>
+          <div><dt>受管会话</dt><dd id="sessionMetric">0</dd></div>
+          <div class="workspace-metric"><dt>Codex 工作目录</dt><dd id="workspaceMetric">--</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="view is-visible" id="accountsView" data-view-panel="accounts">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">WECHAT ACCOUNTS</p>
+          <h1>微信账号</h1>
+        </div>
+        <button class="icon-button" id="refreshAccountsButton" type="button" title="刷新账号状态" aria-label="刷新账号状态">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+      </div>
+      <div id="accountsList" class="account-list" aria-live="polite"></div>
+    </section>
+
+    <section class="view" id="sessionsView" data-view-panel="sessions" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CODEX SESSIONS</p>
+          <h1>会话</h1>
+        </div>
+        <button class="button button-secondary" id="newSessionButton" type="button">
+          <i data-lucide="plus"></i>
+          <span>新建会话</span>
+        </button>
+      </div>
+      <div class="session-account-bar" aria-label="微信账号筛选">
+        <span class="session-account-bar-label"><i data-lucide="users"></i><span>微信账号</span></span>
+        <div class="session-account-tabs" id="sessionAccountTabs" aria-label="按微信账号筛选会话"></div>
+      </div>
+      <div class="session-workbench">
+        <aside class="session-sidebar" aria-label="Codex 会话列表">
+          <div class="session-sidebar-head">
+            <span>历史会话</span>
+            <span id="sessionListCount">0</span>
+          </div>
+          <div id="sessionsList" class="session-list" aria-live="polite"></div>
+        </aside>
+        <section class="chat-panel" id="sessionChatPanel" aria-label="会话消息">
+          <header class="chat-header" id="chatHeader">
+            <div>
+              <p class="eyebrow">THREAD HISTORY</p>
+              <h2 id="chatTitle">选择一个会话</h2>
+              <p class="chat-context" id="chatContext">查看历史消息并继续聊天</p>
+            </div>
+            <button class="icon-button" id="refreshMessagesButton" type="button" title="刷新消息" aria-label="刷新消息" disabled>
+              <i data-lucide="refresh-cw"></i>
+            </button>
+          </header>
+          <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+          <form class="chat-composer" id="chatComposer">
+            <div class="composer-files" id="composerFiles" aria-live="polite" hidden></div>
+            <div class="composer-controls">
+              <button class="icon-button chat-attach" id="chatAttachButton" type="button" title="添加附件" aria-label="添加附件" disabled>
+                <i data-lucide="paperclip"></i>
+              </button>
+              <input id="chatFileInput" type="file" multiple hidden disabled>
+              <label class="sr-only" for="chatInput">继续聊天</label>
+              <textarea id="chatInput" rows="2" maxlength="100000" placeholder="给 Codex 发送消息…" disabled></textarea>
+              <button class="button button-primary chat-send" id="chatSendButton" type="submit" disabled>
+                <i data-lucide="send"></i>
+                <span>发送</span>
+              </button>
+            </div>
+            <p class="composer-hint">Enter 发送 · Shift + Enter 换行</p>
+          </form>
+        </section>
+      </div>
+    </section>
+
+    <section class="view settings-view" id="settingsView" data-view-panel="settings" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">LOCAL CODEX</p>
+          <h1>设置</h1>
+        </div>
+      </div>
+      <form id="settingsForm" class="settings-form">
+        <div class="settings-group">
+          <h2>工作区</h2>
+          <label>
+            <span>默认工作目录</span>
+            <input id="defaultCwdInput" name="defaultCwd" autocomplete="off" required>
+          </label>
+          <label>
+            <span>允许的工作目录</span>
+            <textarea id="allowedWorkspacesInput" name="allowedWorkspaces" rows="5" required></textarea>
+          </label>
+        </div>
+        <div class="settings-group">
+          <h2>Codex</h2>
+          <div class="field-grid">
+            <label>
+              <span>后端</span>
+              <select id="backendInput" name="codexBackend">
+                <option value="auto">自动</option>
+                <option value="app-server">App server</option>
+                <option value="exec">Exec</option>
+              </select>
+            </label>
+            <label>
+              <span>Exec 沙箱</span>
+              <select id="sandboxInput" name="codexExecSandbox">
+                <option value="">沿用 Codex 设置</option>
+                <option value="read-only">只读</option>
+                <option value="workspace-write">工作区可写</option>
+                <option value="danger-full-access">完整访问</option>
+              </select>
+            </label>
+            <label>
+              <span>模型</span>
+              <select id="modelInput" name="model">
+                <option value="">沿用 Codex 设置</option>
+              </select>
+              <small class="field-hint effective-setting"><span>当前生效</span><strong id="effectiveModelValue">正在读取</strong></small>
+            </label>
+            <label>
+              <span>推理强度</span>
+              <select id="effortInput" name="effort">
+                <option value="">沿用模型默认</option>
+              </select>
+              <small class="field-hint effective-setting"><span>当前生效</span><strong id="effectiveEffortValue">正在读取</strong></small>
+            </label>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="button button-primary" type="submit">
+            <i data-lucide="save"></i>
+            <span>保存设置</span>
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <dialog class="modal qr-modal" id="qrDialog">
+    <div class="modal-header">
+      <div>
+        <p class="eyebrow">WECHAT LOGIN</p>
+        <h2>微信扫码登录</h2>
+      </div>
+      <button class="icon-button" type="button" data-close-dialog="qrDialog" title="关闭" aria-label="关闭扫码窗口">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="qr-stage">
+      <div class="qr-frame" id="qrFrame">
+        <div class="spinner" aria-label="正在生成二维码"></div>
+      </div>
+      <p id="qrStatus" class="qr-status">正在生成二维码</p>
+    </div>
+    <div class="modal-footer">
+      <button class="button button-secondary" id="refreshQrButton" type="button">
+        <i data-lucide="refresh-cw"></i>
+        <span>刷新二维码</span>
+      </button>
+    </div>
+  </dialog>
+
+  <dialog class="modal" id="accountDialog">
+    <form id="accountForm" method="dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">ACCOUNT REMARK</p>
+          <h2>修改微信账号备注</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog="accountDialog" title="关闭" aria-label="关闭账号备注窗口">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <input id="editingRemarkAccountId" type="hidden">
+      <div class="modal-body form-stack">
+        <label>
+          <span>账号备注</span>
+          <input id="accountRemarkInput" maxlength="40" autocomplete="off" placeholder="例如：张三、李四">
+          <small class="field-hint">备注只保存在本机；清空后恢复默认名称。</small>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="button button-secondary" type="button" data-close-dialog="accountDialog">取消</button>
+        <button class="button button-primary" type="submit">
+          <i data-lucide="check"></i>
+          <span>保存</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="modal session-modal" id="sessionDialog">
+    <form id="sessionForm" method="dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">MANAGED SESSION</p>
+          <h2 id="sessionDialogTitle">新建会话</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog="sessionDialog" title="关闭" aria-label="关闭会话窗口">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <input id="editingSessionId" type="hidden">
+      <input id="editingAccountId" type="hidden">
+      <div class="modal-body form-stack">
+        <label id="senderField">
+          <span>微信账号</span>
+          <select id="sessionSenderInput" required></select>
+        </label>
+        <label>
+          <span>会话名称</span>
+          <input id="sessionTitleInput" maxlength="80" autocomplete="off" required>
+        </label>
+        <label id="sessionWorkspaceField">
+          <span>工作目录</span>
+          <input id="sessionWorkspaceInput" autocomplete="off" required>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button class="button button-secondary" type="button" data-close-dialog="sessionDialog">取消</button>
+        <button class="button button-primary" type="submit">
+          <i data-lucide="check"></i>
+          <span>保存</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+</body>
+</html>

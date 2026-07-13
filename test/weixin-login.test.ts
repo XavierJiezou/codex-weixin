@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { resolveStatePaths } from "../src/state/paths.js";
-import { loginWithQr } from "../src/weixin/login.js";
+import { createQrLoginSession, loginWithQr } from "../src/weixin/login.js";
 
 async function withMutedConsole<T>(fn: () => Promise<T>): Promise<T> {
   const originalLog = console.log;
@@ -49,11 +49,49 @@ test("login uses current iLink QR GET endpoints and stores the confirmed account
 
   assert.equal(account.accountId, "account-1");
   assert.equal(account.baseUrl, "https://region.example");
+  assert.equal(account.enabled, true);
   assert.equal(calls[0].url, "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3");
   assert.equal(calls[0].init.method, "GET");
   assert.equal(calls[1].url, "https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=qr-token");
   assert.equal(calls[1].init.method, "GET");
   assert.equal((calls[1].init.headers as Record<string, string>)["iLink-App-ClientVersion"], "1");
+});
+
+test("reusable login session exposes scanned state before confirmation", async () => {
+  let statusCalls = 0;
+  const session = await createQrLoginSession({
+    timeoutMs: 1000,
+    fetch: async (url) => {
+      if (String(url).includes("get_bot_qrcode")) {
+        return new Response(JSON.stringify({ qrcode: "token", qrcode_img_content: "content" }));
+      }
+      statusCalls += 1;
+      return new Response(JSON.stringify(statusCalls === 1
+        ? { status: "scaned" }
+        : { status: "confirmed", bot_token: "secret", ilink_bot_id: "bot" }));
+    }
+  });
+
+  assert.equal((await session.poll()).status, "scanned");
+  const confirmed = await session.poll();
+  assert.equal(confirmed.status, "confirmed");
+  if (confirmed.status === "confirmed") {
+    assert.equal(confirmed.account.accountId, "bot");
+  }
+});
+
+test("reusable login session expires without another network request", async () => {
+  let calls = 0;
+  const session = await createQrLoginSession({
+    timeoutMs: -1,
+    fetch: async () => {
+      calls += 1;
+      return new Response(JSON.stringify({ qrcode: "token", qrcode_img_content: "content" }));
+    }
+  });
+
+  assert.equal((await session.poll()).status, "expired");
+  assert.equal(calls, 1);
 });
 
 test("login follows scaned_but_redirect host before confirmation", async (t) => {

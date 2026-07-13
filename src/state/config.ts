@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 import { parseCodexExecSandbox, type CodexExecSandbox } from "../codex/sandbox.js";
@@ -18,7 +19,7 @@ export type CodexWeixinConfig = {
   maxInboundBytes: number;
 };
 
-export function defaultConfig(cwd = process.cwd()): CodexWeixinConfig {
+export function defaultConfig(cwd = path.join(os.homedir(), ".codex-weixin")): CodexWeixinConfig {
   return {
     defaultCwd: path.resolve(cwd),
     allowedSenderIds: [],
@@ -31,8 +32,8 @@ export function defaultConfig(cwd = process.cwd()): CodexWeixinConfig {
   };
 }
 
-export function loadConfig(paths: StatePaths, cwd = process.cwd()): CodexWeixinConfig {
-  const base = defaultConfig(cwd);
+export function loadConfig(paths: StatePaths, cwd?: string): CodexWeixinConfig {
+  const base = cwd ? defaultConfig(cwd) : defaultConfig();
   const loaded = readJsonFile<Partial<CodexWeixinConfig>>(paths.configPath, {});
   const codexExecSandbox = parseCodexExecSandbox(loaded.codexExecSandbox);
   return {
@@ -57,4 +58,3 @@ export function isWorkspaceAllowed(workspace: string, allowedWorkspaces: string[
     return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
   });
 }
-

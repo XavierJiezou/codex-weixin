@@ -116,3 +116,50 @@ test("continues with the remaining batch after one message fails", async (t) => 
   assert.deepEqual(handled, ["first", "second"]);
   assert.deepEqual(failures, ["first:message failed"]);
 });
+
+test("skips duplicate message ids and persists the latest sync key", async (t) => {
+  t.mock.method(console, "log", () => {});
+  const controller = new AbortController();
+  const claimed = new Set<string>();
+  const handled: string[] = [];
+  const syncKeys: string[] = [];
+  let polls = 0;
+  const client = {
+    async getUpdates(syncKey?: string) {
+      polls += 1;
+      if (polls === 1) {
+        assert.equal(syncKey, "sync-start");
+        return {
+          get_updates_buf: "sync-next",
+          msgs: [
+            { message_id: "duplicate", from_user_id: "alice", text: "hello" },
+            { message_id: "duplicate", from_user_id: "alice", text: "hello" }
+          ]
+        };
+      }
+      controller.abort();
+      return { get_updates_buf: "sync-final", msgs: [] };
+    }
+  } as WeixinApiClient;
+
+  await monitorWeixin({
+    client,
+    signal: controller.signal,
+    pollIntervalMs: 0,
+    initialSyncKey: "sync-start",
+    claimMessage(message) {
+      if (claimed.has(message.id)) return false;
+      claimed.add(message.id);
+      return true;
+    },
+    onSyncKey(syncKey) {
+      syncKeys.push(syncKey);
+    },
+    async onMessage(message) {
+      handled.push(message.id);
+    }
+  });
+
+  assert.deepEqual(handled, ["duplicate"]);
+  assert.deepEqual(syncKeys, ["sync-next", "sync-final"]);
+});

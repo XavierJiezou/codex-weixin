@@ -1,4 +1,10 @@
-import { AppServerCodexRunner, type CodexRunnerInput } from "./app-server-runner.js";
+import {
+  AppServerCodexRunner,
+  type CodexHistoryMessage,
+  type CodexModelOption,
+  type CodexRunnerInput,
+  type CodexRuntimeInfo
+} from "./app-server-runner.js";
 import { CodexExecRunner, type CodexRunResult } from "./exec-runner.js";
 import type { CodexExecSandbox } from "./sandbox.js";
 
@@ -34,7 +40,7 @@ export class HybridCodexRunner {
     try {
       return await this.appServer.run(input);
     } catch (error) {
-      if (this.options.backend === "app-server" || input.threadId) {
+      if (this.options.backend === "app-server") {
         throw error;
       }
       const fallback = await this.exec.run(input);
@@ -46,11 +52,26 @@ export class HybridCodexRunner {
   }
 
   async stop(threadId?: string): Promise<void> {
-    await this.appServer.stop(threadId);
+    await Promise.all([
+      this.appServer.stop(threadId),
+      this.exec.stop(threadId)
+    ]);
+  }
+
+  async getHistory(threadId: string): Promise<CodexHistoryMessage[]> {
+    return this.appServer.getHistory(threadId);
+  }
+
+  async getRuntimeInfo(cwd: string, threadId?: string): Promise<CodexRuntimeInfo> {
+    return this.appServer.getRuntimeInfo(cwd, threadId);
+  }
+
+  async listModels(): Promise<CodexModelOption[]> {
+    return this.appServer.listModels();
   }
 
   close(): void {
     this.appServer.close();
+    this.exec.close();
   }
 }
-

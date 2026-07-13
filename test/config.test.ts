@@ -4,8 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { loadConfig } from "../src/state/config.js";
+import { defaultConfig, loadConfig } from "../src/state/config.js";
 import { resolveStatePaths } from "../src/state/paths.js";
+
+test("uses ~/.codex-weixin as the default Codex workspace", () => {
+  assert.equal(defaultConfig().defaultCwd, path.join(os.homedir(), ".codex-weixin"));
+  assert.deepEqual(defaultConfig().allowedWorkspaces, [path.join(os.homedir(), ".codex-weixin")]);
+});
 
 test("loads an explicit codex exec sandbox", (t) => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-config-"));

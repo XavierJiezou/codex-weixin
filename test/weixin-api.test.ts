@@ -58,9 +58,11 @@ test("builds getupdates requests with iLink cursor field", async () => {
     }
   });
 
-  await client.getUpdates("cursor-1");
+  const controller = new AbortController();
+  await client.getUpdates("cursor-1", controller.signal);
 
   assert.equal(calls[0].url, "https://ilink.example/ilink/bot/getupdates");
+  assert.equal(calls[0].init.signal, controller.signal);
   assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
     get_updates_buf: "cursor-1",
     base_info: { channel_version: "0.1.0" }

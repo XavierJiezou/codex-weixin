@@ -8,8 +8,14 @@ const BRIDGE_ACTION_INSTRUCTIONS = [
   "{\"send\":[{\"type\":\"image\",\"path\":\"C:/absolute/path/image.png\"},{\"type\":\"video\",\"path\":\"C:/absolute/path/video.mp4\"}]}",
   "```"
 ].join("\n");
+const LEGACY_BRIDGE_ACTION_INSTRUCTIONS = BRIDGE_ACTION_INSTRUCTIONS
+  .replaceAll("codex-weixin-actions", "codex-weixin-server-actions");
 
-export function buildPrompt(text: string, attachments: PromptBufferItem[] = []): string {
+export function buildPrompt(
+  text: string,
+  attachments: PromptBufferItem[] = [],
+  attachmentSource: "WeChat" | "Web" = "WeChat"
+): string {
   const lines: string[] = [BRIDGE_ACTION_INSTRUCTIONS];
   if (text.trim()) {
     lines.push(text.trim());
@@ -18,10 +24,40 @@ export function buildPrompt(text: string, attachments: PromptBufferItem[] = []):
     if (attachment.kind === "text") {
       lines.push(attachment.text);
     } else {
-      lines.push(`[WeChat ${attachment.kind}: ${attachment.label} saved to ${attachment.path}]\nInspect the saved local attachment before answering.`);
+      lines.push(`[${attachmentSource} ${attachment.kind}: ${attachment.label} saved to ${attachment.path}]\nInspect the saved local attachment before answering.`);
     }
   }
   return lines.join("\n\n").trim();
+}
+
+export type PromptAttachment = {
+  source: "WeChat" | "Web";
+  kind: "file" | "image" | "video" | "audio";
+  label: string;
+  path: string;
+};
+
+export function parsePrompt(text: string): { text: string; attachments: PromptAttachment[] } {
+  let normalized = text.trim();
+  for (const instructions of [BRIDGE_ACTION_INSTRUCTIONS, LEGACY_BRIDGE_ACTION_INSTRUCTIONS]) {
+    if (normalized.startsWith(instructions)) {
+      normalized = normalized.slice(instructions.length).trim();
+      break;
+    }
+  }
+  const attachments: PromptAttachment[] = [];
+  const visibleText = normalized.replace(
+    /^\[(WeChat|Web) (file|image|video|audio): (.+) saved to (.+)]\nInspect the saved local attachment before answering\.$/gm,
+    (_match, source: PromptAttachment["source"], kind: PromptAttachment["kind"], label: string, filePath: string) => {
+      attachments.push({ source, kind, label, path: filePath });
+      return "";
+    }
+  ).replace(/\n{3,}/g, "\n\n").trim();
+  return { text: visibleText, attachments };
+}
+
+export function stripBridgeInstructions(text: string): string {
+  return parsePrompt(text).text;
 }
 
 export function chunkText(text: string, limit = 1800): string[] {

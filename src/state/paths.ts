@@ -1,6 +1,8 @@
 import os from "node:os";
 import path from "node:path";
 
+import { normalizeAccountId } from "../weixin/accounts.js";
+
 export function defaultStateDir(): string {
   return path.join(os.homedir(), ".codex-weixin");
 }
@@ -12,6 +14,7 @@ export type StatePaths = {
   statePath: string;
   inboundDir: string;
   logsDir: string;
+  runtimeDir: string;
 };
 
 export function resolveStatePaths(root = defaultStateDir()): StatePaths {
@@ -21,7 +24,18 @@ export function resolveStatePaths(root = defaultStateDir()): StatePaths {
     configPath: path.join(root, "config.json"),
     statePath: path.join(root, "state.json"),
     inboundDir: path.join(root, "inbound"),
-    logsDir: path.join(root, "logs")
+    logsDir: path.join(root, "logs"),
+    runtimeDir: path.join(root, "runtime")
   };
 }
 
+export function accountStatePaths(paths: StatePaths, accountId: string): StatePaths {
+  const safeId = normalizeAccountId(accountId);
+  const accountRoot = path.join(paths.runtimeDir, safeId);
+  return {
+    ...paths,
+    statePath: path.join(accountRoot, "state.json"),
+    inboundDir: path.join(paths.inboundDir, safeId),
+    logsDir: path.join(paths.logsDir, safeId)
+  };
+}
