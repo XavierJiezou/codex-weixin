@@ -129,22 +129,35 @@ export function formatCodexExecFailure(code: number | null, stderr: string): Err
   return new Error(base);
 }
 
-export function resolveCodexCommand(codexBin: string): { command: string; argsPrefix: string[] } {
+export type ResolveCodexCommandOptions = {
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+  execPath?: string;
+  existsSync?: (target: string) => boolean;
+};
+
+export function resolveCodexCommand(
+  codexBin: string,
+  options: ResolveCodexCommandOptions = {}
+): { command: string; argsPrefix: string[] } {
+  const execPath = options.execPath ?? process.execPath;
   if (/\.(?:js|mjs|cjs)$/i.test(codexBin)) {
-    return { command: process.execPath, argsPrefix: [codexBin] };
+    return { command: execPath, argsPrefix: [codexBin] };
   }
 
-  if (process.platform !== "win32") {
+  const platform = options.platform ?? process.platform;
+  if (platform !== "win32") {
     return { command: codexBin, argsPrefix: [] };
   }
 
-  const npmShim = process.env.CHAT_CODEX_BIN;
-  const npmRoot = npmShim ? path.dirname(npmShim) : "";
+  const npmShim = (options.env ?? process.env).CHAT_CODEX_BIN;
+  const pathApi = platform === "win32" ? path.win32 : path;
+  const npmRoot = npmShim ? pathApi.dirname(npmShim) : "";
   const bundledCli = npmRoot
-    ? path.join(npmRoot, "node_modules", "@openai", "codex", "bin", "codex.js")
+    ? pathApi.join(npmRoot, "node_modules", "@openai", "codex", "bin", "codex.js")
     : "";
-  if (bundledCli && fs.existsSync(bundledCli)) {
-    return { command: process.execPath, argsPrefix: [bundledCli] };
+  if (bundledCli && (options.existsSync ?? fs.existsSync)(bundledCli)) {
+    return { command: execPath, argsPrefix: [bundledCli] };
   }
 
   return { command: codexBin, argsPrefix: [] };

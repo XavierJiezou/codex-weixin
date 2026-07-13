@@ -8,7 +8,8 @@ import {
   CodexExecRunner,
   extractFinalText,
   formatCodexExecFailure,
-  parseCodexExecOutput
+  parseCodexExecOutput,
+  resolveCodexCommand
 } from "../src/codex/exec-runner.js";
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
@@ -48,6 +49,22 @@ test("explains how to recover from the Windows background sandbox error", () => 
   assert.match(error.message, /codexExecSandbox/);
   assert.match(error.message, /danger-full-access/);
   assert.match(error.message, /full access/i);
+});
+
+test("resolves a Windows npm codex.cmd shim to the real Node entry point", () => {
+  const npmShim = String.raw`C:\Users\THU\AppData\Roaming\npm\codex.cmd`;
+  const bundledCli = String.raw`C:\Users\THU\AppData\Roaming\npm\node_modules\@openai\codex\bin\codex.js`;
+  const node = String.raw`C:\Program Files\nodejs\node.exe`;
+
+  assert.deepEqual(resolveCodexCommand("codex.cmd", {
+    platform: "win32",
+    env: { CHAT_CODEX_BIN: npmShim },
+    execPath: node,
+    existsSync: (candidate) => candidate === bundledCli
+  }), {
+    command: node,
+    argsPrefix: [bundledCli]
+  });
 });
 
 test("extracts nested agent_message text and thread id from codex json output", () => {

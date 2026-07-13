@@ -3,12 +3,22 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { AccountManager } from "../src/server/account-manager.js";
-import { startLocalHttpServer } from "../src/server/http-server.js";
+import { checkCodex, startLocalHttpServer } from "../src/server/http-server.js";
 import { defaultConfig, saveConfig } from "../src/state/config.js";
 import { resolveStatePaths } from "../src/state/paths.js";
 import { saveAccount } from "../src/weixin/accounts.js";
+
+test("Codex status probe reuses the runner command resolver", async () => {
+  const codexBin = fileURLToPath(new URL("./fixtures/fake-codex-version.mjs", import.meta.url));
+
+  assert.deepEqual(await checkCodex(codexBin), {
+    ready: true,
+    version: "codex-cli windows-shim-test"
+  });
+});
 
 test("local API redacts credentials and protects mutations", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-http-"));

@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 
 import { z } from "zod";
 
+import { resolveCodexCommand } from "../codex/exec-runner.js";
 import { loadConfig, saveConfig } from "../state/config.js";
 import type { StatePaths } from "../state/paths.js";
 import type { CodexModelOption, CodexRuntimeInfo } from "../codex/app-server-runner.js";
@@ -561,9 +562,10 @@ function mediaContentType(fileName: string): string {
   } as Record<string, string>)[extension] ?? "application/octet-stream";
 }
 
-async function checkCodex(codexBin: string): Promise<{ ready: boolean; version?: string; error?: string }> {
+export async function checkCodex(codexBin: string): Promise<{ ready: boolean; version?: string; error?: string }> {
   try {
-    const result = await execFileAsync(codexBin, ["--version"], { timeout: 5_000 });
+    const command = resolveCodexCommand(codexBin);
+    const result = await execFileAsync(command.command, [...command.argsPrefix, "--version"], { timeout: 5_000 });
     return { ready: true, version: result.stdout.trim() || result.stderr.trim() || codexBin };
   } catch (error) {
     return { ready: false, error: error instanceof Error ? error.message : String(error) };
