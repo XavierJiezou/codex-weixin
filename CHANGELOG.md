@@ -2,6 +2,12 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.4] - 2026-07-15
+
+### Fixed
+
+- Added a browser favicon matching the terminal-and-WeChat mark in the Web header and reused it as the README logo.
+
 ## [0.2.3] - 2026-07-15
 
 ### Added
@@ -59,6 +65,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.4]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.4
 [0.2.3]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.3
 [0.2.2]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.2
 [0.2.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.1

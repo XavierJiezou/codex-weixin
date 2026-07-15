@@ -1,7 +1,7 @@
 <h1 align="center">codex-weixin</h1>
 
 <p align="center">
-  <img src="docs/images/codex-weixin-logo.png" alt="codex-weixin logo" width="480" />
+  <img src="src/web/favicon.svg" alt="codex-weixin logo" width="128" height="128" />
 </p>
 
 <p align="center">

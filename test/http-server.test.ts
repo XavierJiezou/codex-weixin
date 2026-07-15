@@ -71,6 +71,13 @@ test("local API redacts credentials and protects mutations", async (t) => {
   assert.deepEqual(bootstrap.codexModels.map((model) => model.model), ["runtime-model"]);
   assert.equal(JSON.stringify(bootstrap).includes("must-never-reach-browser"), false);
 
+  const pageResponse = await fetch(server.url);
+  assert.match(await pageResponse.text(), /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+  const faviconResponse = await fetch(`${server.url}/favicon.svg`);
+  assert.equal(faviconResponse.status, 200);
+  assert.match(faviconResponse.headers.get("content-type") ?? "", /^image\/svg\+xml/);
+  assert.match(await faviconResponse.text(), /<title>codex-weixin<\/title>/);
+
   const unauthorizedRename = await fetch(`${server.url}/api/accounts/account-one`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

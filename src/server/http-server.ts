@@ -307,11 +307,6 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
 
   if (method === "GET" && !url.pathname.startsWith("/api/")) {
-    if (url.pathname === "/favicon.ico") {
-      response.statusCode = 204;
-      response.end();
-      return;
-    }
     serveStatic(response, url.pathname);
     return;
   }
@@ -339,6 +334,8 @@ function serveStatic(response: ServerResponse, pathname: string): void {
   const files: Record<string, { name: string; type: string }> = {
     "/": { name: "index.html", type: "text/html; charset=utf-8" },
     "/index.html": { name: "index.html", type: "text/html; charset=utf-8" },
+    "/favicon.ico": { name: "favicon.svg", type: "image/svg+xml" },
+    "/favicon.svg": { name: "favicon.svg", type: "image/svg+xml" },
     "/styles.css": { name: "styles.css", type: "text/css; charset=utf-8" },
     "/app.js": { name: "app.js", type: "text/javascript; charset=utf-8" },
     "/vendor/lucide.min.js": { name: "vendor/lucide.min.js", type: "text/javascript; charset=utf-8" },
