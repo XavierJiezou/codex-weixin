@@ -196,6 +196,35 @@
     </section>
   </main>
 
+  <dialog class="modal update-modal" id="updateDialog" aria-labelledby="updateDialogTitle">
+    <div class="modal-header update-modal-header">
+      <div>
+        <p class="eyebrow">PRODUCT UPDATE</p>
+        <h2 id="updateDialogTitle">发现新版本</h2>
+      </div>
+      <span class="update-modal-icon" aria-hidden="true"><i data-lucide="package"></i></span>
+    </div>
+    <div class="modal-body update-modal-body">
+      <div class="update-version-flow" aria-label="版本升级">
+        <span><small>当前版本</small><strong id="updateCurrentVersion">--</strong></span>
+        <i data-lucide="arrow-right" aria-hidden="true"></i>
+        <span class="is-latest"><small>最新版本</small><strong id="updateLatestVersion">--</strong></span>
+      </div>
+      <p class="update-description">更新期间微信连接会短暂中断，完成后服务将自动重启并恢复连接。</p>
+      <div class="update-progress" id="updateProgress" aria-live="polite" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <div><strong id="updateProgressTitle">正在安装更新</strong><span id="updateProgressDetail">请保持此页面打开</span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="button button-secondary" id="updateLaterButton" type="button">稍后</button>
+      <button class="button button-primary" id="updateNowButton" type="button">
+        <i data-lucide="download"></i>
+        <span>立即更新</span>
+      </button>
+    </div>
+  </dialog>
+
   <dialog class="modal qr-modal" id="qrDialog">
     <div class="modal-header">
       <div>

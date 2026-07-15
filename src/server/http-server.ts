@@ -14,6 +14,7 @@ import type { StatePaths } from "../state/paths.js";
 import type { CodexModelOption, CodexRuntimeInfo } from "../codex/app-server-runner.js";
 import type { AccountManager, SessionAttachmentFile, SessionHistoryMessage, SessionUpload } from "./account-manager.js";
 import { LoginManager } from "./login-manager.js";
+import { UpdateManager, type UpdateService } from "./update-manager.js";
 
 const bodySchema = z.record(z.string(), z.unknown());
 const accountDisplayNameSchema = z.object({
@@ -47,6 +48,8 @@ export type LocalHttpServerOptions = {
   codexCheck?: () => Promise<{ ready: boolean; version?: string; error?: string }>;
   codexRuntimeCheck?: () => Promise<CodexRuntimeInfo>;
   codexModelsCheck?: () => Promise<CodexModelOption[]>;
+  updateService?: UpdateService;
+  onUpdateInstalled?: (version: string) => void;
 };
 
 export type LocalHttpServer = {
@@ -57,16 +60,20 @@ export type LocalHttpServer = {
 
 export async function startLocalHttpServer(options: LocalHttpServerOptions): Promise<LocalHttpServer> {
   const requestToken = crypto.randomBytes(24).toString("base64url");
+  const productVersion = options.productVersion ?? readProductVersion();
   const loginManager = options.loginManager ?? new LoginManager({
     paths: options.paths,
     accountManager: options.accountManager
   });
+  const updateService = options.updateService ?? new UpdateManager({ currentVersion: productVersion });
   let actualPort = options.port ?? 8787;
   const server = http.createServer((request, response) => {
     void handleRequest(request, response, {
       ...options,
       loginManager,
+      productVersion,
       requestToken,
+      updateService,
       port: actualPort
     }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -92,7 +99,9 @@ export async function startLocalHttpServer(options: LocalHttpServerOptions): Pro
 
 type HandlerContext = LocalHttpServerOptions & {
   loginManager: LoginManager;
+  productVersion: string;
   requestToken: string;
+  updateService: UpdateService;
   port: number;
 };
 
@@ -124,7 +133,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     ]);
     sendJson(response, 200, {
       product: "codex-weixin",
-      version: context.productVersion ?? readProductVersion(),
+      version: context.productVersion,
       requestToken: context.requestToken,
       config,
       codex,
@@ -133,6 +142,25 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
       accounts: context.accountManager.listAccounts(),
       sessions: context.accountManager.listSessions()
     });
+    return;
+  }
+  if (method === "GET" && url.pathname === "/api/update") {
+    sendJson(response, 200, await context.updateService.check());
+    return;
+  }
+  if (method === "POST" && url.pathname === "/api/update") {
+    const result = await context.updateService.installLatest();
+    sendJson(response, 200, { ok: true, ...result, restarting: Boolean(context.onUpdateInstalled) });
+    if (context.onUpdateInstalled) {
+      const timer = setTimeout(() => {
+        try {
+          context.onUpdateInstalled?.(result.version);
+        } catch (error) {
+          console.error(`[codex-weixin] unable to schedule restart: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }, 250);
+      timer.unref();
+    }
     return;
   }
   if (method === "GET" && url.pathname === "/api/accounts") {
@@ -470,7 +498,10 @@ function optionalString(value: unknown): string | undefined {
 }
 
 function errorStatus(message: string): number {
-  return /not found/i.test(message) ? 404 : /required|invalid|allowed|empty|too large|too many|exceed/i.test(message) ? 400 : 500;
+  if (/not found/i.test(message)) return 404;
+  if (/already in progress|no newer/i.test(message)) return 409;
+  if (/unable to verify|timed out/i.test(message)) return 503;
+  return /required|invalid|allowed|empty|too large|too many|exceed/i.test(message) ? 400 : 500;
 }
 
 function sendJson(response: ServerResponse, status: number, value: unknown): void {

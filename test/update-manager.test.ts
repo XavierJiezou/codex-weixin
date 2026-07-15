@@ -1,0 +1,158 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  buildNpmInstallCommand,
+  isNewerVersion,
+  UpdateManager
+} from "../src/server/update-manager.js";
+
+test("compares stable semantic versions without accepting command-like input", () => {
+  assert.equal(isNewerVersion("1.2.3", "1.2.4"), true);
+  assert.equal(isNewerVersion("1.2.3", "1.3.0"), true);
+  assert.equal(isNewerVersion("1.2.3", "2.0.0"), true);
+  assert.equal(isNewerVersion("1.2.3", "1.2.3"), false);
+  assert.equal(isNewerVersion("1.2.3", "1.2.2"), false);
+  assert.throws(() => isNewerVersion("1.2.3", "1.2.4;whoami"), /Invalid stable version/);
+  assert.throws(() => isNewerVersion("1.2.3", "999999999999999999.0.0"), /Invalid stable version/);
+});
+
+test("checks and caches the npm latest version", async () => {
+  let fetchCalls = 0;
+  let now = Date.parse("2026-07-15T00:00:00.000Z");
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    now: () => now,
+    cacheTtlMs: 60_000,
+    fetch: async () => {
+      fetchCalls += 1;
+      return new Response(JSON.stringify({ version: "1.3.0" }), { status: 200 });
+    }
+  });
+
+  assert.deepEqual(await manager.check(), {
+    currentVersion: "1.2.3",
+    latestVersion: "1.3.0",
+    updateAvailable: true,
+    checkedAt: "2026-07-15T00:00:00.000Z",
+    registry: "official"
+  });
+  assert.equal((await manager.check()).latestVersion, "1.3.0");
+  assert.equal(fetchCalls, 2);
+
+  now += 60_001;
+  await manager.check();
+  assert.equal(fetchCalls, 4);
+});
+
+test("uses the first valid registry and installs from that same registry", async () => {
+  const requested: string[] = [];
+  const installed: Array<{ version: string; registry: string }> = [];
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    fetch: async (input, init) => {
+      const url = String(input);
+      requested.push(url);
+      if (url.startsWith("https://registry.npmmirror.com/")) {
+        return new Response(JSON.stringify({ version: "1.2.4" }), { status: 200 });
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    },
+    install: async (version, registry) => {
+      installed.push({ version, registry });
+    }
+  });
+
+  assert.deepEqual(await manager.installLatest(), { version: "1.2.4", registry: "npmmirror" });
+  assert.deepEqual(installed, [{ version: "1.2.4", registry: "npmmirror" }]);
+  assert.deepEqual(requested.sort(), [
+    "https://registry.npmjs.org/codex-weixin/latest",
+    "https://registry.npmmirror.com/codex-weixin/latest"
+  ].sort());
+});
+
+test("falls back when one registry returns invalid metadata", async () => {
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    fetch: async (input) => String(input).includes("npmmirror")
+      ? new Response(JSON.stringify({ version: "latest" }), { status: 200 })
+      : new Response(JSON.stringify({ version: "1.2.5" }), { status: 200 })
+  });
+
+  const status = await manager.check();
+  assert.equal(status.latestVersion, "1.2.5");
+  assert.equal(status.registry, "official");
+});
+
+test("does not let a stale fast mirror hide a newer official version", async () => {
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    fetch: async (input) => String(input).includes("npmmirror")
+      ? new Response(JSON.stringify({ version: "1.2.3" }), { status: 200 })
+      : new Promise<Response>((resolve) => setTimeout(() => {
+        resolve(new Response(JSON.stringify({ version: "1.2.4" }), { status: 200 }));
+      }, 5))
+  });
+
+  const status = await manager.check();
+  assert.equal(status.latestVersion, "1.2.4");
+  assert.equal(status.registry, "official");
+});
+
+test("keeps update-check failures non-fatal", async () => {
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    fetch: async () => {
+      throw new Error("offline");
+    }
+  });
+
+  const status = await manager.check();
+  assert.equal(status.currentVersion, "1.2.3");
+  assert.equal(status.updateAvailable, false);
+  assert.equal(status.error, "无法检查新版本");
+});
+
+test("installs only the server-verified latest version and rejects concurrent updates", async () => {
+  const installed: Array<{ version: string; registry: string }> = [];
+  let finishInstall: (() => void) | undefined;
+  const installWait = new Promise<void>((resolve) => {
+    finishInstall = resolve;
+  });
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    fetch: async () => new Response(JSON.stringify({ version: "1.2.4" }), { status: 200 }),
+    install: async (version, registry) => {
+      installed.push({ version, registry });
+      await installWait;
+    }
+  });
+
+  const first = manager.installLatest();
+  await assert.rejects(manager.installLatest(), /already in progress/);
+  finishInstall?.();
+  assert.deepEqual(await first, { version: "1.2.4", registry: "official" });
+  assert.deepEqual(installed, [{ version: "1.2.4", registry: "official" }]);
+});
+
+test("builds fixed cross-platform npm install commands", () => {
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "npmmirror", "darwin", {}, "/node"), {
+    command: "npm",
+    args: ["install", "--global", "codex-weixin@1.2.4", "--registry=https://registry.npmmirror.com", "--no-audit", "--no-fund"]
+  });
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", "win32", { ComSpec: "C:\\Windows\\cmd.exe" }, "C:\\node.exe"), {
+    command: "C:\\Windows\\cmd.exe",
+    args: ["/d", "/s", "/c", "npm", "install", "--global", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+  });
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", "win32", { npm_execpath: "C:\\npm\\npm-cli.js" }, "C:\\node.exe"), {
+    command: "C:\\node.exe",
+    args: ["C:\\npm\\npm-cli.js", "install", "--global", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+  });
+  assert.throws(() => buildNpmInstallCommand("latest", "official"), /Invalid stable version/);
+  assert.throws(
+    () => buildNpmInstallCommand("1.2.4", "https://registry.example.com" as never),
+    /Invalid npm Registry/
+  );
+});

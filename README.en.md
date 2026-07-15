@@ -37,6 +37,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | ✅ | Models and reasoning effort | Model-aware dropdowns loaded from app-server, including GPT-5.6 Sol, Terra, and Luna for IkunCoding. | Pending: `docs/images/screenshots/web-model-settings.png` |
 | ✅ | Typing state and deduplication | Web typing state plus persistent sync cursors and message IDs prevent duplicate replies. | Pending: `docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server first | New and resumed sessions prefer Codex app-server V2 and fall back to `codex exec` when unavailable. | Pending: `docs/images/screenshots/wechat-status.png` |
+| ✅ | Web auto-update | Automatically selects npm or npmmirror, then installs, restarts, and reconnects from the Web prompt. | Pending: `docs/images/screenshots/web-auto-update.png` |
 
 ## Web management preview
 

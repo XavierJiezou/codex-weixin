@@ -2,6 +2,18 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.6] - 2026-07-15
+
+### Added
+
+- Added non-blocking Web update checks with a "Later" or "Update now" prompt when a newer stable npm release is available.
+- Added automatic npm Registry selection between the official registry and npmmirror, including stale-mirror verification and installation through the selected source.
+- Added guarded global package installation followed by a detached, cross-platform service restart and automatic Web reconnection.
+
+### Security
+
+- Restricted Web-triggered updates to a server-verified stable `codex-weixin` version and fixed Registry allowlist, protected by the existing localhost, Origin, and request-token checks.
+
 ## [0.2.5] - 2026-07-15
 
 ### Added
@@ -71,6 +83,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.6]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.6
 [0.2.5]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.5
 [0.2.4]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.4
 [0.2.3]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.3

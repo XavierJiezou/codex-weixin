@@ -37,6 +37,7 @@
 | ✅ | 模型和推理强度 | 从 app-server 读取模型能力并通过下拉列表切换；IkunCoding 支持 GPT-5.6 Sol、Terra 和 Luna。 | 待补：`docs/images/screenshots/web-model-settings.png` |
 | ✅ | 输入状态与去重 | Web 显示“对方正在输入…”，并持久记录同步游标和消息 ID，防止重复回复。 | 待补：`docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server 优先 | 新旧会话优先使用 Codex app-server V2；不可用时自动回退到 `codex exec`。 | 待补：`docs/images/screenshots/wechat-status.png` |
+| ✅ | Web 自动更新 | 后台自动选择 npm 官方源或 npmmirror；发现新版本后可在 Web 安装、重启并恢复连接。 | 待补：`docs/images/screenshots/web-auto-update.png` |
 
 ## Web 管理页预览
 

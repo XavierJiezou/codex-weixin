@@ -14,12 +14,17 @@ const state = {
   loadingMessages: false,
   sendingMessage: false,
   savingSessionRuntime: false,
+  updateInfo: null,
+  updateInstalling: false,
   selectedAccountId: "",
   chatFiles: []
 };
 
 const MAX_CHAT_FILES = 10;
 const MAX_CHAT_FILE_BYTES = 50 * 1024 * 1024;
+const DISMISSED_UPDATE_KEY = "codex-weixin.dismissed-update";
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_RECONNECT_TIMEOUT_MS = 90 * 1000;
 
 const els = {};
 
@@ -49,6 +54,14 @@ document.addEventListener("DOMContentLoaded", () => {
     qrDialog: document.querySelector("#qrDialog"),
     qrFrame: document.querySelector("#qrFrame"),
     qrStatus: document.querySelector("#qrStatus"),
+    updateDialog: document.querySelector("#updateDialog"),
+    updateCurrentVersion: document.querySelector("#updateCurrentVersion"),
+    updateLatestVersion: document.querySelector("#updateLatestVersion"),
+    updateProgress: document.querySelector("#updateProgress"),
+    updateProgressTitle: document.querySelector("#updateProgressTitle"),
+    updateProgressDetail: document.querySelector("#updateProgressDetail"),
+    updateLaterButton: document.querySelector("#updateLaterButton"),
+    updateNowButton: document.querySelector("#updateNowButton"),
     accountDialog: document.querySelector("#accountDialog"),
     sessionDialog: document.querySelector("#sessionDialog")
   });
@@ -81,6 +94,12 @@ function bindEvents() {
   els.sessionsList.addEventListener("click", (event) => void handleSessionAction(event));
   els.sessionAccountTabs.addEventListener("click", handleSessionAccountTab);
   els.qrDialog.addEventListener("close", stopLoginPoll);
+  els.updateLaterButton.addEventListener("click", dismissUpdate);
+  els.updateNowButton.addEventListener("click", () => void installUpdate());
+  els.updateDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    if (!state.updateInstalling) dismissUpdate();
+  });
   window.addEventListener("hashchange", () => showView(location.hash.slice(1) || "accounts", false));
 }
 
@@ -98,10 +117,135 @@ async function bootstrap() {
     renderAll();
     showView(location.hash.slice(1) || "accounts", false);
     window.setInterval(() => void refreshData(false), 5000);
+    void checkForUpdate();
+    window.setInterval(() => void checkForUpdate(), UPDATE_CHECK_INTERVAL_MS);
   } catch (error) {
     toast(error.message, true);
     els.accountsList.innerHTML = emptyState("server-off", "无法连接本机服务", "请重新启动 codex-weixin");
   }
+}
+
+async function checkForUpdate() {
+  if (state.updateInstalling) return;
+  try {
+    const info = await api("/api/update", { token: false });
+    if (!info.updateAvailable || !info.latestVersion || dismissedUpdateVersion() === info.latestVersion) {
+      return;
+    }
+    state.updateInfo = info;
+    els.updateCurrentVersion.textContent = `v${String(info.currentVersion).replace(/^v/i, "")}`;
+    els.updateLatestVersion.textContent = `v${String(info.latestVersion).replace(/^v/i, "")}`;
+    resetUpdateDialog();
+    if (!els.updateDialog.open) els.updateDialog.showModal();
+    drawIcons();
+  } catch {
+    // Update checks are best-effort and must not interrupt the local management page.
+  }
+}
+
+function dismissUpdate() {
+  if (state.updateInstalling) return;
+  const version = state.updateInfo?.latestVersion;
+  if (version) {
+    try {
+      localStorage.setItem(DISMISSED_UPDATE_KEY, version);
+    } catch {
+      // Dismissing still works when browser storage is unavailable.
+    }
+  }
+  state.updateInfo = null;
+  if (els.updateDialog.open) els.updateDialog.close();
+}
+
+async function installUpdate() {
+  if (state.updateInstalling || !state.updateInfo?.latestVersion) return;
+  const previousToken = state.requestToken;
+  state.updateInstalling = true;
+  els.updateLaterButton.disabled = true;
+  els.updateNowButton.disabled = true;
+  els.updateNowButton.querySelector("span").textContent = "更新中";
+  setUpdateProgress(
+    "正在安装更新",
+    `正在连接${updateRegistryName(state.updateInfo.registry)}，微信服务将继续运行`
+  );
+  try {
+    const result = await api("/api/update", { method: "POST" });
+    const targetVersion = result.version;
+    state.updateInfo = { ...state.updateInfo, latestVersion: targetVersion, registry: result.registry };
+    els.updateLatestVersion.textContent = `v${String(targetVersion).replace(/^v/i, "")}`;
+    if (!result.restarting) {
+      throw new Error("更新已安装，但自动重启未启动，请手动重启 codex-weixin");
+    }
+    setUpdateProgress(
+      "正在重启服务",
+      `已通过${updateRegistryName(result.registry)}完成安装，正在恢复微信连接`
+    );
+    await waitForUpdatedService(targetVersion, previousToken);
+    setUpdateProgress("更新完成", "新版本已启动，正在刷新页面");
+    window.location.reload();
+  } catch (error) {
+    state.updateInstalling = false;
+    els.updateLaterButton.disabled = false;
+    els.updateNowButton.disabled = false;
+    els.updateNowButton.querySelector("span").textContent = "重试更新";
+    setUpdateProgress("更新未完成", error.message || "请稍后重试", true);
+  }
+}
+
+async function waitForUpdatedService(targetVersion, previousToken) {
+  const deadline = Date.now() + UPDATE_RECONNECT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch("/api/bootstrap", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (
+        response.ok
+        && data.version === targetVersion
+        && data.requestToken
+        && data.requestToken !== previousToken
+      ) {
+        state.requestToken = data.requestToken;
+        state.version = data.version;
+        return;
+      }
+    } catch {
+      // The service is expected to be briefly unavailable while it restarts.
+    }
+    await delay(900);
+  }
+  throw new Error("新版本已安装，但服务未能自动恢复，请手动重启 codex-weixin");
+}
+
+function resetUpdateDialog() {
+  state.updateInstalling = false;
+  els.updateProgress.hidden = true;
+  els.updateProgress.classList.remove("is-error");
+  els.updateLaterButton.disabled = false;
+  els.updateNowButton.disabled = false;
+  els.updateNowButton.querySelector("span").textContent = "立即更新";
+}
+
+function setUpdateProgress(title, detail, error = false) {
+  els.updateProgress.hidden = false;
+  els.updateProgress.classList.toggle("is-error", error);
+  els.updateProgressTitle.textContent = title;
+  els.updateProgressDetail.textContent = detail;
+}
+
+function updateRegistryName(registry) {
+  return registry === "npmmirror" ? "国内镜像" : "npm 官方源";
+}
+
+function dismissedUpdateVersion() {
+  try {
+    return localStorage.getItem(DISMISSED_UPDATE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function refreshData(notify) {

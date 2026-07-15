@@ -34,6 +34,10 @@ test("local API redacts credentials and protects mutations", async (t) => {
     enabled: false
   });
   const manager = new AccountManager({ paths });
+  let resolveRestart!: (version: string) => void;
+  const restartRequested = new Promise<string>((resolve) => {
+    resolveRestart = resolve;
+  });
   const server = await startLocalHttpServer({
     paths,
     accountManager: manager,
@@ -48,7 +52,18 @@ test("local API redacts credentials and protects mutations", async (t) => {
       isDefault: true,
       defaultEffort: "medium",
       supportedEfforts: [{ effort: "medium", description: "Balanced" }]
-    }]
+    }],
+    updateService: {
+      check: async () => ({
+        currentVersion: "9.8.7",
+        latestVersion: "9.9.0",
+        updateAvailable: true,
+        checkedAt: "2026-07-15T00:00:00.000Z",
+        registry: "npmmirror"
+      }),
+      installLatest: async () => ({ version: "9.9.0", registry: "npmmirror" })
+    },
+    onUpdateInstalled: resolveRestart
   });
   t.after(() => server.close());
 
@@ -82,6 +97,26 @@ test("local API redacts credentials and protects mutations", async (t) => {
   assert.equal(faviconResponse.status, 200);
   assert.match(faviconResponse.headers.get("content-type") ?? "", /^image\/svg\+xml/);
   assert.match(await faviconResponse.text(), /<title>codex-weixin<\/title>/);
+
+  const updateResponse = await fetch(`${server.url}/api/update`);
+  assert.deepEqual(await updateResponse.json(), {
+    currentVersion: "9.8.7",
+    latestVersion: "9.9.0",
+    updateAvailable: true,
+    checkedAt: "2026-07-15T00:00:00.000Z",
+    registry: "npmmirror"
+  });
+  const unauthorizedUpdate = await fetch(`${server.url}/api/update`, { method: "POST" });
+  assert.equal(unauthorizedUpdate.status, 403);
+  const installedUpdate = await fetch(`${server.url}/api/update`, {
+    method: "POST",
+    headers: {
+      "X-Codex-Weixin-Token": bootstrap.requestToken,
+      Origin: server.url
+    }
+  });
+  assert.deepEqual(await installedUpdate.json(), { ok: true, version: "9.9.0", registry: "npmmirror", restarting: true });
+  assert.equal(await restartRequested, "9.9.0");
 
   const unauthorizedRename = await fetch(`${server.url}/api/accounts/account-one`, {
     method: "PATCH",

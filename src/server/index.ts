@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { fileURLToPath } from "node:url";
+
 import open from "open";
 
 import { resolveStatePaths } from "../state/paths.js";
@@ -6,6 +8,7 @@ import { AccountManager } from "./account-manager.js";
 import { parseServerCommand, serverHelpText } from "./arguments.js";
 import { startLocalHttpServer } from "./http-server.js";
 import { acquireServiceProcessLock } from "./process-lock.js";
+import { launchRestartHelper } from "./restart.js";
 
 async function main(): Promise<void> {
   const stateDir = process.env.CODEX_WEIXIN_STATE_DIR;
@@ -14,8 +17,41 @@ async function main(): Promise<void> {
   const processLock = acquireServiceProcessLock(paths.root);
   const accountManager = new AccountManager({ paths });
   let server: Awaited<ReturnType<typeof startLocalHttpServer>> | undefined;
+  let shuttingDown = false;
+  let restartScheduled = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    try {
+      await accountManager.stopAll();
+      await server?.close();
+    } finally {
+      processLock.release();
+    }
+  };
+  const scheduleRestart = (version: string) => {
+    if (restartScheduled) return;
+    restartScheduled = true;
+    const timer = setTimeout(() => {
+      try {
+        launchRestartHelper({
+          parentPid: process.pid,
+          entryPath: fileURLToPath(import.meta.url),
+          stateDir: paths.root,
+          port
+        });
+      } catch (error) {
+        restartScheduled = false;
+        console.error(`[codex-weixin] unable to restart after update: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+      console.log(`[codex-weixin] updated to ${version}; restarting`);
+      void shutdown().finally(() => process.exit(0));
+    }, 500);
+    timer.unref();
+  };
   try {
-    server = await startLocalHttpServer({ paths, accountManager, port });
+    server = await startLocalHttpServer({ paths, accountManager, port, onUpdateInstalled: scheduleRestart });
     await accountManager.startAll();
   } catch (error) {
     await accountManager.stopAll();
@@ -32,17 +68,6 @@ async function main(): Promise<void> {
     });
   }
 
-  let shuttingDown = false;
-  const shutdown = async () => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    try {
-      await accountManager.stopAll();
-      await server.close();
-    } finally {
-      processLock.release();
-    }
-  };
   process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
   process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
 }
