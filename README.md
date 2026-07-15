@@ -12,6 +12,8 @@
   <strong>把个人微信账号接入本机 OpenAI Codex。</strong>
 </p>
 
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/f0eb172a-c13d-491e-8596-f12e099eab53" />
+
 `codex-weixin` 是一个跨平台、本机运行的微信到 Codex 专用服务。启动后会打开 Web 管理页；用户在页面扫码登录微信，即可从微信私聊控制本机 Codex、管理工作目录和切换会话。
 
 ```text
