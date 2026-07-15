@@ -19,6 +19,11 @@ const bodySchema = z.record(z.string(), z.unknown());
 const accountDisplayNameSchema = z.object({
   displayName: z.string().max(40)
 });
+const sessionPatchSchema = z.object({
+  title: z.string().max(80).optional(),
+  model: z.string().max(200).nullable().optional(),
+  effort: z.string().max(40).nullable().optional()
+}).refine((value) => Object.keys(value).length > 0, "Session update is empty");
 const configSchema = z.object({
   defaultCwd: z.string().min(1),
   allowedWorkspaces: z.array(z.string().min(1)).min(1),
@@ -37,6 +42,7 @@ export type LocalHttpServerOptions = {
   paths: StatePaths;
   accountManager: AccountManager;
   loginManager?: LoginManager;
+  productVersion?: string;
   port?: number;
   codexCheck?: () => Promise<{ ready: boolean; version?: string; error?: string }>;
   codexRuntimeCheck?: () => Promise<CodexRuntimeInfo>;
@@ -118,6 +124,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     ]);
     sendJson(response, 200, {
       product: "codex-weixin",
+      version: context.productVersion ?? readProductVersion(),
       requestToken: context.requestToken,
       config,
       codex,
@@ -246,13 +253,27 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
   const sessionMatch = matchPath(url.pathname, "/api/sessions/:accountId/:sessionId");
   if (method === "PATCH" && sessionMatch) {
-    const body = bodySchema.parse(await readJsonBody(request));
-    sendJson(response, 200, {
-      session: context.accountManager.renameSession(
+    const body = sessionPatchSchema.parse(await readJsonBody(request));
+    let session;
+    if (body.title !== undefined) {
+      session = context.accountManager.renameSession(
         sessionMatch.accountId,
         sessionMatch.sessionId,
-        requiredString(body.title, "title")
-      )
+        body.title
+      );
+    }
+    if (body.model !== undefined || body.effort !== undefined) {
+      session = context.accountManager.updateSessionRuntime(
+        sessionMatch.accountId,
+        sessionMatch.sessionId,
+        {
+          ...(body.model !== undefined ? { model: body.model } : {}),
+          ...(body.effort !== undefined ? { effort: body.effort } : {})
+        }
+      );
+    }
+    sendJson(response, 200, {
+      session
     });
     return;
   }
@@ -295,6 +316,15 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     return;
   }
   sendJson(response, 404, { error: "Not found" });
+}
+
+function readProductVersion(): string {
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version?: unknown };
+    return typeof packageJson.version === "string" ? packageJson.version : "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 function readCodexRuntime(context: HandlerContext): Promise<CodexRuntimeInfo> {

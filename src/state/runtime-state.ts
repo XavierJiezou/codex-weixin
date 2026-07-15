@@ -10,8 +10,15 @@ export type ManagedSession = {
   title: string;
   workspace: string;
   threadId?: string;
+  model?: string;
+  effort?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SessionRuntimeOverrides = {
+  model?: string | null;
+  effort?: string | null;
 };
 
 export type RuntimeState = {
@@ -133,6 +140,34 @@ export class RuntimeStateStore {
     return this.getActiveSession(senderId)?.threadId;
   }
 
+  setModelOverride(senderId: string, model?: string): void {
+    const session = this.mutableActiveSession(senderId);
+    if (!session) {
+      throw new Error(`No active session for sender: ${senderId}`);
+    }
+    if (model?.trim()) {
+      session.model = model.trim();
+    } else {
+      delete session.model;
+    }
+    session.updatedAt = new Date().toISOString();
+    this.save();
+  }
+
+  setEffortOverride(senderId: string, effort?: string): void {
+    const session = this.mutableActiveSession(senderId);
+    if (!session) {
+      throw new Error(`No active session for sender: ${senderId}`);
+    }
+    if (effort?.trim()) {
+      session.effort = effort.trim();
+    } else {
+      delete session.effort;
+    }
+    session.updatedAt = new Date().toISOString();
+    this.save();
+  }
+
   listSessions(): ManagedSession[] {
     return structuredClone(this.state.sessions)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -208,6 +243,23 @@ export class RuntimeStateStore {
       session.threadId = threadId;
     } else {
       delete session.threadId;
+    }
+    session.updatedAt = new Date().toISOString();
+    this.save();
+    return structuredClone(session);
+  }
+
+  updateSessionRuntime(sessionId: string, overrides: SessionRuntimeOverrides): ManagedSession {
+    const session = this.mutableSession(sessionId);
+    if (Object.hasOwn(overrides, "model")) {
+      const model = overrides.model?.trim();
+      if (model) session.model = model;
+      else delete session.model;
+    }
+    if (Object.hasOwn(overrides, "effort")) {
+      const effort = overrides.effort?.trim();
+      if (effort) session.effort = effort;
+      else delete session.effort;
     }
     session.updatedAt = new Date().toISOString();
     this.save();

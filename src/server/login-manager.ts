@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import QRCode from "qrcode";
 
-import { saveAccount, publicAccount, type PublicWeixinAccount } from "../weixin/accounts.js";
+import { saveScannedAccount, publicAccount, type PublicWeixinAccount } from "../weixin/accounts.js";
 import { createQrLoginSession, type QrLoginUpdate, type WeixinQrLoginSession } from "../weixin/login.js";
 import type { StatePaths } from "../state/paths.js";
 import type { AccountManager } from "./account-manager.js";
@@ -58,9 +58,9 @@ export class LoginManager {
     const update = await record.session.poll();
     record.status = update.status;
     if (update.status === "confirmed") {
-      saveAccount(this.options.paths, update.account);
-      await this.options.accountManager.startAccount(update.account.accountId, false);
-      record.account = publicAccount(update.account);
+      const saved = saveScannedAccount(this.options.paths, update.account);
+      await this.options.accountManager.refreshAccount(saved.account.accountId);
+      record.account = publicAccount(saved.account);
     }
     return { status: record.status, ...(record.account ? { account: record.account } : {}) };
   }

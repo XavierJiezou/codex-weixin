@@ -31,7 +31,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | ✅ | Browser QR connection | Shows waiting, scanned, connected, and expired QR states. | Pending: `docs/images/screenshots/wechat-qr-login.png` |
 | ✅ | Session management | Grouped account tabs, Markdown history, continued Codex threads, and create, rename, activate, reset, and delete actions. | [Web sessions](docs/images/screenshots/web-session-management.png) |
 | ✅ | Web text and attachments | Send text with up to 10 files (50 MB total), with media playback, preview, and download in history. | Pending: `docs/images/screenshots/web-attachments.png` |
-| ✅ | WeChat private-chat control | Supports regular messages plus `/status`, `/new`, `/bind`, `/prompt start`, `/prompt done`, and `/stop`. | Pending: `docs/images/screenshots/wechat-chat.png` |
+| ✅ | WeChat private-chat control | Supports regular messages plus `/status`, `/new`, `/bind`, `/model`, `/effort`, `/prompt start`, `/prompt done`, and `/stop`. | Pending: `docs/images/screenshots/wechat-chat.png` |
 | ✅ | WeChat media input | Accepts transcribed voice, images, audio, video, and files as local Codex attachments. | Pending: `docs/images/screenshots/wechat-media-input.png` |
 | ✅ | File delivery to WeChat | Codex can return local images, videos, and files as native WeChat messages. | Pending: `docs/images/screenshots/wechat-media-output.png` |
 | ✅ | Models and reasoning effort | Model-aware dropdowns loaded from app-server, including GPT-5.6 Sol, Terra, and Luna for IkunCoding. | Pending: `docs/images/screenshots/web-model-settings.png` |
@@ -90,15 +90,15 @@ npm start
 4. Return to WeChat Accounts and allow the pending sender.
 5. Send the message again to start a Codex turn.
 
-Repeat the QR flow to add more accounts. Every account has its own monitor, sender authorization, inbound directory, and managed-session state. A failed account does not stop the others.
+Repeat the QR flow to add more accounts. Every account has its own monitor, sender authorization, inbound directory, and managed-session state. A failed account does not stop the others. Scanning the same WeChat account again after an expired login refreshes the existing credentials while preserving its local remark, authorization, and sessions instead of creating an empty duplicate.
 
 ## Session management
 
 The Sessions page manages conversations created and used by this server. It does not scan or take ownership of every Codex conversation created in other terminals.
 
-Selecting a session reads its user messages and final replies from Codex's own persisted thread. The Web composer can submit text and multiple files as one turn and continues that same thread, so context remains shared with later WeChat messages. Uploads are isolated by account and session under `~/.codex-weixin/inbound/`, with at most 10 files and 50 MB total per turn.
+Selecting a session reads its user messages and final replies from Codex's own persisted thread. The controls below the chat title select a model and reasoning effort for the current session or keep inheriting global settings; they share the same session configuration used by the WeChat `/model` and `/effort` commands. The Web composer can submit text and multiple files as one turn and continues that same thread, so context remains shared with later WeChat messages. Uploads are isolated by account and session under `~/.codex-weixin/inbound/`, with at most 10 files and 50 MB total per turn.
 
-The UI does not display `@im.bot`, `@im.wechat`, or Codex thread IDs. The first two are internal iLink routing identifiers, not profile names. Each account can have a local remark edited from the WeChat Accounts page; the remark is reused by session tabs, with `WeChat Account 1` used only as a fallback. The current QR and messaging APIs do not expose WeChat nicknames, avatars, or a profile lookup endpoint, so the page uses a default icon while retaining those identifiers only in local state for correct routing.
+The UI uses local remarks instead of treating internal IDs as account names. Expand “Account IDs” on an account card to inspect its iLink Bot ID and User ID; Codex thread IDs remain hidden from the regular UI. Each account can have a local remark edited from the WeChat Accounts page; the remark is reused by session tabs, with `WeChat Account 1` used only as a fallback. The current QR and messaging APIs do not expose WeChat nicknames, avatars, or a profile lookup endpoint, so the page uses a default icon.
 
 - Each authorized WeChat account has one active session and may own multiple named sessions.
 - Activate chooses which Codex thread receives the sender's next message.
@@ -113,6 +113,10 @@ The UI does not display `@im.bot`, `@im.wechat`, or Codex thread IDs. The first 
 /status                       Show session, workspace, thread, backend, effective model, and reasoning effort
 /bind <absolute-path>          Bind to an allowed workspace
 /new                          Create a new managed Codex session
+/model                        Show the current and available models
+/model <number|model|default>  Switch this session's model or restore inheritance
+/effort                       Show reasoning efforts supported by the current model
+/effort <number|level|default> Switch this session's effort or restore inheritance
 /prompt start                 Buffer multiple WeChat messages
 /prompt done                  Submit the buffer as one Codex turn
 /stop                         Interrupt the current Codex task
@@ -148,7 +152,9 @@ WeChat does not currently expose Codex approval prompts, so app-server uses `app
 
 The Settings page loads available models and model-specific reasoning efforts from Codex app-server. Leaving a field on "Use Codex settings" preserves the Codex configuration; choosing and saving an explicit value applies it to later Web and WeChat turns.
 
-The IkunCoding provider also exposes `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. These options remain available after switching to another model. Send `/status` in WeChat to inspect the effective model and reasoning effort.
+Send `/model` or `/effort` in WeChat to get a numbered list, then switch by number or exact ID. A WeChat-side selection applies only to the active managed session, without affecting other accounts, senders, or sessions. `/model default` and `/effort default` restore inheritance from Web/Codex settings. Continuing that session from the Web page uses the same session overrides.
+
+The IkunCoding provider also exposes `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`. These options remain available after switching to another model in both the Web dropdown and WeChat `/model` list. Send `/status` in WeChat to inspect the effective model and reasoning effort.
 
 ## Local data
 

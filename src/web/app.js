@@ -1,4 +1,5 @@
 const state = {
+  version: "",
   requestToken: "",
   accounts: [],
   sessions: [],
@@ -12,6 +13,7 @@ const state = {
   loadedSessionKey: "",
   loadingMessages: false,
   sendingMessage: false,
+  savingSessionRuntime: false,
   selectedAccountId: "",
   chatFiles: []
 };
@@ -24,6 +26,7 @@ const els = {};
 document.addEventListener("DOMContentLoaded", () => {
   Object.assign(els, {
     accountsList: document.querySelector("#accountsList"),
+    productVersion: document.querySelector("#productVersion"),
     sessionsList: document.querySelector("#sessionsList"),
     sessionAccountTabs: document.querySelector("#sessionAccountTabs"),
     sessionListCount: document.querySelector("#sessionListCount"),
@@ -37,6 +40,9 @@ document.addEventListener("DOMContentLoaded", () => {
     chatFileInput: document.querySelector("#chatFileInput"),
     composerFiles: document.querySelector("#composerFiles"),
     refreshMessagesButton: document.querySelector("#refreshMessagesButton"),
+    sessionRuntimeToolbar: document.querySelector("#sessionRuntimeToolbar"),
+    sessionModelInput: document.querySelector("#sessionModelInput"),
+    sessionEffortInput: document.querySelector("#sessionEffortInput"),
     runningAccountMetric: document.querySelector("#runningAccountMetric"),
     sessionMetric: document.querySelector("#sessionMetric"),
     workspaceMetric: document.querySelector("#workspaceMetric"),
@@ -59,6 +65,8 @@ function bindEvents() {
   document.querySelector("#newSessionButton").addEventListener("click", openNewSessionDialog);
   document.querySelector("#settingsForm").addEventListener("submit", (event) => void saveSettings(event));
   document.querySelector("#modelInput").addEventListener("change", () => renderEffortOptions(""));
+  els.sessionModelInput.addEventListener("change", () => void handleSessionModelChange());
+  els.sessionEffortInput.addEventListener("change", () => void saveSessionRuntimeSettings());
   document.querySelector("#accountForm").addEventListener("submit", (event) => void saveAccountRemark(event));
   document.querySelector("#sessionForm").addEventListener("submit", (event) => void saveSession(event));
   document.querySelector("#sessionSenderInput").addEventListener("change", updateNewSessionDefaultTitle);
@@ -80,6 +88,7 @@ async function bootstrap() {
   try {
     const data = await api("/api/bootstrap", { token: false });
     state.requestToken = data.requestToken;
+    state.version = data.version || "";
     state.accounts = data.accounts;
     state.sessions = data.sessions;
     state.config = data.config;
@@ -125,11 +134,18 @@ async function refreshData(notify) {
 }
 
 function renderAll() {
+  renderProductVersion();
   renderMetrics();
   renderAccounts();
   renderSessions();
   renderSettings();
   drawIcons();
+}
+
+function renderProductVersion() {
+  const version = state.version.trim();
+  els.productVersion.hidden = !version;
+  els.productVersion.textContent = version ? `v${version.replace(/^v/i, "")}` : "";
 }
 
 function renderMetrics() {
@@ -149,6 +165,11 @@ function renderMetrics() {
 }
 
 function renderAccounts() {
+  const expandedAccountIds = new Set(
+    [...els.accountsList.querySelectorAll(".account-identifiers[open]")]
+      .map((details) => details.dataset.accountId)
+      .filter(Boolean)
+  );
   if (!state.accounts.length) {
     els.accountsList.innerHTML = emptyState("scan-line", "还没有微信账号", "", `<button class="button button-primary" type="button" data-account-action="add"><i data-lucide="scan-line"></i><span>添加微信</span></button>`);
     drawIcons();
@@ -175,6 +196,16 @@ function renderAccounts() {
           <button class="icon-button is-danger" type="button" data-account-action="remove" data-account-id="${escapeAttr(account.accountId)}" title="移除账号" aria-label="移除账号"><i data-lucide="trash-2"></i></button>
         </div>
       </div>
+      <details class="account-identifiers" data-account-id="${escapeAttr(account.accountId)}"${expandedAccountIds.has(account.accountId) ? " open" : ""}>
+        <summary>
+          <span class="account-identifiers-title"><i data-lucide="fingerprint"></i><strong>账号 ID</strong><small>Bot ID 与 User ID</small></span>
+          <i class="account-identifiers-chevron" data-lucide="chevron-down"></i>
+        </summary>
+        <dl class="account-identifiers-grid">
+          <div><dt>Bot ID</dt><dd><code title="${escapeAttr(account.botId || account.accountId)}">${escapeHtml(account.botId || account.accountId)}</code></dd></div>
+          <div><dt>User ID</dt><dd><code title="${escapeAttr(account.userId || "未返回")}">${escapeHtml(account.userId || "未返回")}</code></dd></div>
+        </dl>
+      </details>
       <div class="account-detail">${renderAuthorizationState(account, pendingSender)}</div>
       ${authorized && pendingSender ? `<div class="pending-access"><div><strong>新的微信访问请求</strong><span>当前授权不受影响，可选择允许新的访问</span></div><button class="button button-secondary" type="button" data-account-action="allow" data-account-id="${escapeAttr(account.accountId)}" data-sender-id="${escapeAttr(pendingSender)}"><i data-lucide="user-check"></i><span>允许访问</span></button></div>` : ""}
       ${account.error ? `<div class="pending-access"><div><strong>账号运行错误</strong><span>${escapeHtml(account.error)}</span></div></div>` : ""}
@@ -481,13 +512,14 @@ async function loadSelectedSessionMessages() {
 
 function renderChatPanel() {
   const session = selectedSession();
-  const enabled = Boolean(session) && !state.sendingMessage;
+  const enabled = Boolean(session) && !state.sendingMessage && !state.savingSessionRuntime;
   els.chatInput.disabled = !enabled;
   els.chatAttachButton.disabled = !enabled;
   els.chatFileInput.disabled = !enabled;
   els.refreshMessagesButton.disabled = !session || state.loadingMessages || state.sendingMessage;
   renderComposerFiles();
   updateComposerState();
+  renderSessionRuntimeControls(session);
   if (!session) {
     els.chatTitle.textContent = "选择一个会话";
     els.chatContext.textContent = "查看历史消息并继续聊天";
@@ -520,6 +552,112 @@ function renderChatPanel() {
     <div class="message-bubble">${message.text ? renderMarkdown(message.text) : ""}${renderMessageAttachments(message.attachments)}</div>
   </article>`).join("") + (responding ? renderTypingIndicator() : "");
   setChatMessagesHtml(html, renderKey);
+}
+
+function renderSessionRuntimeControls(session) {
+  const disabled = !session || state.sendingMessage || state.savingSessionRuntime;
+  els.sessionModelInput.disabled = disabled;
+  els.sessionEffortInput.disabled = disabled;
+  const renderKey = session ? [
+    sessionKey(session),
+    session.model || "",
+    session.effort || "",
+    state.config?.model || "",
+    state.config?.effort || "",
+    state.codexRuntime?.model || "",
+    state.codexRuntime?.effort || "",
+    state.codexModels.length
+  ].join("|") : "none";
+  if (els.sessionRuntimeToolbar.dataset.renderKey === renderKey) return;
+  els.sessionRuntimeToolbar.dataset.renderKey = renderKey;
+
+  if (!session) {
+    els.sessionModelInput.innerHTML = '<option value="">选择会话后设置</option>';
+    els.sessionEffortInput.innerHTML = '<option value="">选择会话后设置</option>';
+    return;
+  }
+
+  const inheritedModel = state.config?.model || state.codexRuntime?.model || "";
+  const models = Array.isArray(state.codexModels) ? state.codexModels : [];
+  const options = [{
+    value: "",
+    label: inheritedModel ? `继承全局（${inheritedModel}）` : "继承全局设置"
+  }, ...models.map((model) => ({
+    value: model.model,
+    label: model.displayName && model.displayName !== model.model
+      ? `${model.displayName} · ${model.model}`
+      : model.model,
+    title: model.description || ""
+  }))];
+  if (session.model && !options.some((option) => option.value === session.model)) {
+    options.push({ value: session.model, label: `${session.model}（当前会话）`, title: "" });
+  }
+  els.sessionModelInput.innerHTML = options.map((option) => `<option value="${escapeAttr(option.value)}"${option.title ? ` title="${escapeAttr(option.title)}"` : ""}>${escapeHtml(option.label)}</option>`).join("");
+  els.sessionModelInput.value = session.model || "";
+  setSessionEffortOptions(session.model || "", session.effort || "");
+}
+
+function setSessionEffortOptions(modelOverride, preferredEffort) {
+  const effectiveModel = modelOverride || state.config?.model || state.codexRuntime?.model || "";
+  const model = state.codexModels.find((candidate) => candidate.model === effectiveModel);
+  const advertised = model?.supportedEfforts?.length
+    ? model.supportedEfforts
+    : state.codexModels.flatMap((candidate) => candidate.supportedEfforts || []);
+  const efforts = [...new Map(advertised.map((option) => [option.effort, option])).values()]
+    .sort((a, b) => effortRank(a.effort) - effortRank(b.effort));
+  if (preferredEffort && !efforts.some((option) => option.effort === preferredEffort)) {
+    efforts.push({ effort: preferredEffort, description: "当前会话" });
+  }
+  const inheritedEffort = state.config?.effort || state.codexRuntime?.effort || model?.defaultEffort;
+  const inheritedLabel = inheritedEffort
+    ? `继承全局（${effortInlineName(inheritedEffort)}）`
+    : "继承全局设置";
+  els.sessionEffortInput.innerHTML = [
+    `<option value="">${escapeHtml(inheritedLabel)}</option>`,
+    ...efforts.map((option) => `<option value="${escapeAttr(option.effort)}"${option.description ? ` title="${escapeAttr(option.description)}"` : ""}>${escapeHtml(effortDisplayName(option.effort))}</option>`)
+  ].join("");
+  els.sessionEffortInput.value = preferredEffort;
+}
+
+async function handleSessionModelChange() {
+  const modelValue = els.sessionModelInput.value;
+  const model = state.codexModels.find((candidate) => candidate.model === (modelValue || state.config?.model || state.codexRuntime?.model));
+  const efforts = model?.supportedEfforts?.map((option) => option.effort) || [];
+  let effortValue = els.sessionEffortInput.value;
+  const inheritedEffort = state.config?.effort || state.codexRuntime?.effort || "";
+  const effectiveEffort = effortValue || inheritedEffort;
+  if (effectiveEffort && efforts.length && !efforts.includes(effectiveEffort)) {
+    effortValue = efforts.includes(model?.defaultEffort) ? model.defaultEffort : efforts[0] || "";
+  }
+  setSessionEffortOptions(modelValue, effortValue);
+  await saveSessionRuntimeSettings();
+}
+
+async function saveSessionRuntimeSettings() {
+  const session = selectedSession();
+  if (!session || state.savingSessionRuntime) return;
+  const key = sessionKey(session);
+  const model = els.sessionModelInput.value;
+  const effort = els.sessionEffortInput.value;
+  state.savingSessionRuntime = true;
+  renderChatPanel();
+  try {
+    const result = await api(`/api/sessions/${encodeURIComponent(session.accountId)}/${encodeURIComponent(session.id)}`, {
+      method: "PATCH",
+      body: { model: model || null, effort: effort || null }
+    });
+    const index = state.sessions.findIndex((candidate) => sessionKey(candidate) === key);
+    if (index >= 0) state.sessions[index] = result.session;
+    els.sessionRuntimeToolbar.dataset.renderKey = "";
+    renderSessions();
+    toast("会话模型设置已更新");
+  } catch (error) {
+    toast(error.message, true);
+    await refreshData(false);
+  } finally {
+    state.savingSessionRuntime = false;
+    renderChatPanel();
+  }
 }
 
 function renderTypingIndicator() {
@@ -659,7 +797,7 @@ function renderComposerFiles() {
 }
 
 function updateComposerState() {
-  const canCompose = Boolean(selectedSession()) && !state.sendingMessage;
+  const canCompose = Boolean(selectedSession()) && !state.sendingMessage && !state.savingSessionRuntime;
   els.chatInput.disabled = !canCompose;
   els.chatAttachButton.disabled = !canCompose;
   els.chatFileInput.disabled = !canCompose;

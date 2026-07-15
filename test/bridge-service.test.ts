@@ -318,3 +318,104 @@ test("buffers inbound image attachments and includes local paths in prompt done"
   assert.deepEqual(fs.readFileSync(savedPath), plaintext);
   assert.equal(textReplies.filter((reply) => reply === "Buffered. Send /prompt done when ready.").length, 2);
 });
+
+test("lists and switches model and reasoning effort for the active WeChat session", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-model-command-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const paths = resolveStatePaths(path.join(tmpDir, "state"));
+  const stateStore = new RuntimeStateStore(paths);
+  const replies: string[] = [];
+  const runs: Array<{ model?: string; effort?: string }> = [];
+  const models = [{
+    model: "gpt-default",
+    displayName: "GPT Default",
+    description: "Default model",
+    isDefault: true,
+    defaultEffort: "medium",
+    supportedEfforts: [
+      { effort: "low", description: "Low" },
+      { effort: "medium", description: "Medium" }
+    ]
+  }, {
+    model: "gpt-fast",
+    displayName: "GPT Fast",
+    description: "Fast model",
+    isDefault: false,
+    defaultEffort: "low",
+    supportedEfforts: [
+      { effort: "low", description: "Low" },
+      { effort: "high", description: "High" }
+    ]
+  }];
+  const service = new BridgeService({
+    config: {
+      ...defaultConfig(tmpDir),
+      allowedSenderIds: ["alice@im.wechat"],
+      model: "gpt-default",
+      effort: "medium"
+    },
+    stateStore,
+    listCodexModels: async () => models,
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        replies.push(input.text);
+        return { messageId: "text-message" };
+      }
+    } as never,
+    runner: {
+      async run(input: { model?: string; effort?: string }) {
+        runs.push(input);
+        return { raw: "", text: "done", threadId: "thread-model" };
+      },
+      async getRuntimeInfo() {
+        return { model: "runtime-model", effort: "low" };
+      },
+      async stop() {}
+    } as never
+  });
+  const send = async (id: string, text: string) => service.handleMessage({
+    id,
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text,
+    raw: {}
+  });
+
+  await send("model-list", "/model");
+  assert.match(replies.at(-1) ?? "", /2\. GPT Fast（gpt-fast）/);
+  await send("model-switch", "/model 2");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.model, "gpt-fast");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.effort, "low");
+
+  await send("effort-list", "/effort");
+  assert.match(replies.at(-1) ?? "", /2\. 高（high）/);
+  assert.doesNotMatch(replies.at(-1) ?? "", /medium/);
+  await send("effort-switch", "/effort 2");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.effort, "high");
+  await send("invalid-effort", "/effort ultra");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.effort, "high");
+
+  await send("turn", "使用当前设置");
+  assert.equal(runs.at(-1)?.model, "gpt-fast");
+  assert.equal(runs.at(-1)?.effort, "high");
+  await send("status", "/status");
+  assert.match(replies.at(-1) ?? "", /model: gpt-fast/);
+  assert.match(replies.at(-1) ?? "", /effort: high/);
+
+  const overriddenSession = stateStore.getActiveSession("alice@im.wechat")?.id;
+  await send("new", "/new");
+  await send("new-turn", "新会话使用默认值");
+  assert.equal(runs.at(-1)?.model, "gpt-default");
+  assert.equal(runs.at(-1)?.effort, "medium");
+
+  assert.ok(overriddenSession);
+  stateStore.activateSession(overriddenSession);
+  await send("model-default", "/model default");
+  await send("effort-default", "/effort default");
+  await send("default-turn", "恢复默认值");
+  assert.equal(runs.at(-1)?.model, "gpt-default");
+  assert.equal(runs.at(-1)?.effort, "medium");
+  assert.equal(new RuntimeStateStore(paths).getSession(overriddenSession)?.model, undefined);
+  assert.equal(new RuntimeStateStore(paths).getSession(overriddenSession)?.effort, undefined);
+});

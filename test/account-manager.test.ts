@@ -7,7 +7,8 @@ import test from "node:test";
 import { buildPrompt } from "../src/bridge/format.js";
 import { AccountManager } from "../src/server/account-manager.js";
 import { defaultConfig } from "../src/state/config.js";
-import { resolveStatePaths } from "../src/state/paths.js";
+import { accountStatePaths, resolveStatePaths } from "../src/state/paths.js";
+import { RuntimeStateStore } from "../src/state/runtime-state.js";
 import { loadAccount, saveAccount } from "../src/weixin/accounts.js";
 
 function setup(t: test.TestContext) {
@@ -108,6 +109,17 @@ test("starts and stops multiple accounts independently", async (t) => {
   await manager.stopAccount("account-two");
 });
 
+test("refreshes a running account so new credentials take effect", async (t) => {
+  const { manager, starts } = setup(t);
+  await manager.startAccount("account-one", false);
+
+  await manager.refreshAccount("account-one");
+
+  assert.equal(starts.filter((accountId) => accountId === "account-one").length, 2);
+  assert.equal(manager.listAccounts().find((account) => account.accountId === "account-one")?.status, "running");
+  await manager.stopAccount("account-one", false);
+});
+
 test("isolates senders and managed sessions by account", async (t) => {
   const { manager, root } = setup(t);
   await manager.startAll();
@@ -199,6 +211,19 @@ test("reads managed thread history and continues the same session from Web", asy
     { id: "user-1", role: "user", text: "历史问题", attachments: [] },
     { id: "assistant-1", role: "assistant", text: "历史回答", attachments: [] }
   ]);
+});
+
+test("uses WeChat session model overrides when continuing the same session from Web", async (t) => {
+  const { manager, paths, root, runs } = setup(t);
+  const session = manager.createSession("account-one", "alice@im.wechat", root, "Shared chat");
+  const store = new RuntimeStateStore(accountStatePaths(paths, "account-one"));
+  store.setModelOverride("alice@im.wechat", "gpt-session");
+  store.setEffortOverride("alice@im.wechat", "high");
+
+  await manager.continueSession("account-one", session.id, "从 Web 继续");
+
+  assert.equal(runs[0].model, "gpt-session");
+  assert.equal(runs[0].effort, "high");
 });
 
 test("stores Web uploads per session and exposes them in user history", async (t) => {

@@ -1,4 +1,4 @@
-import { DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL, saveAccount, type WeixinAccount } from "./accounts.js";
+import { DEFAULT_BASE_URL, DEFAULT_CDN_BASE_URL, saveScannedAccount, type WeixinAccount } from "./accounts.js";
 import type { FetchLike } from "./api.js";
 import type { StatePaths } from "../state/paths.js";
 
@@ -116,8 +116,7 @@ export async function loginWithQr(options: LoginOptions): Promise<WeixinAccount>
       throw new Error("WeChat QR code expired. Start login again.");
     }
     if (update.status === "confirmed") {
-      saveAccount(options.paths, update.account);
-      return update.account;
+      return saveScannedAccount(options.paths, update.account).account;
     }
   }
 }
@@ -128,6 +127,7 @@ function accountFromStatus(status: QrStatusResponse, pollBaseUrl: string): Weixi
   }
   return {
     accountId: status.ilink_bot_id,
+    botId: status.ilink_bot_id,
     token: status.bot_token,
     userId: status.ilink_user_id,
     baseUrl: status.baseurl ?? status.base_url ?? pollBaseUrl,

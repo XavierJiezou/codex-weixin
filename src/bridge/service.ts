@@ -4,6 +4,7 @@ import { AccessController } from "./access.js";
 import { parseActionBlocks } from "./actions.js";
 import { buildPrompt, chunkText } from "./format.js";
 import { PromptBuffer } from "./prompt-buffer.js";
+import type { CodexModelOption, CodexRuntimeInfo } from "../codex/app-server-runner.js";
 import { HybridCodexRunner } from "../codex/runner.js";
 import { isWorkspaceAllowed, type CodexWeixinConfig } from "../state/config.js";
 import { RuntimeStateStore } from "../state/runtime-state.js";
@@ -17,6 +18,7 @@ export type BridgeServiceOptions = {
   stateStore: RuntimeStateStore;
   weixin: WeixinApiClient;
   runner?: HybridCodexRunner;
+  listCodexModels?: () => Promise<CodexModelOption[]>;
   inboundDir?: string;
   mediaFetch?: FetchLike;
   onTurnStatus?: (status: { senderId: string; sessionId: string; active: boolean }) => void;
@@ -91,6 +93,12 @@ export class BridgeService {
         this.options.stateStore.createSession(message.senderId, this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd);
         await this.reply(message.senderId, "Created a new Codex session for the next message.");
         return;
+      case "model":
+        await this.handleModelCommand(message.senderId, command.arg);
+        return;
+      case "effort":
+        await this.handleEffortCommand(message.senderId, command.arg);
+        return;
       case "prompt":
         await this.handlePromptCommand(message.senderId, command.arg);
         return;
@@ -134,6 +142,87 @@ export class BridgeService {
       return;
     }
     await this.reply(senderId, "Usage: /prompt start or /prompt done");
+  }
+
+  private async handleModelCommand(senderId: string, arg: string): Promise<void> {
+    const models = await this.listCodexModels();
+    const input = arg.trim();
+    if (!input) {
+      const runtime = await this.effectiveRuntime(senderId);
+      const session = this.options.stateStore.getActiveSession(senderId);
+      const lines = [
+        `当前模型：${runtime.model ?? "Codex 默认"}${session?.model ? "（本会话）" : "（继承 Web/Codex 设置）"}`
+      ];
+      if (models.length) {
+        lines.push("", "可用模型：", ...models.map((model, index) => `${index + 1}. ${model.displayName}（${model.model}）`));
+        lines.push("", "发送 /model <序号或模型 ID> 切换；/model default 恢复继承设置。");
+      } else {
+        lines.push("", "暂时无法读取模型列表。仍可发送 /model <完整模型 ID> 切换。", "/model default 恢复继承设置。");
+      }
+      await this.reply(senderId, lines.join("\n"));
+      return;
+    }
+    if (input.toLowerCase() === "default") {
+      this.options.stateStore.setModelOverride(senderId);
+      const runtime = await this.effectiveRuntime(senderId);
+      await this.reply(senderId, `已恢复继承 Web/Codex 模型设置。\n当前模型：${runtime.model ?? "Codex 默认"}`);
+      return;
+    }
+
+    const selected = selectModel(models, input);
+    if (!selected && (models.length || !isPlausibleModelId(input))) {
+      await this.reply(senderId, "模型不存在。发送 /model 查看可用模型，或使用 /model default 恢复继承设置。");
+      return;
+    }
+    const currentRuntime = await this.effectiveRuntime(senderId);
+    const model = selected?.model ?? input;
+    this.options.stateStore.setModelOverride(senderId, model);
+    let adjustedEffort: string | undefined;
+    if (currentRuntime.effort && selected?.supportedEfforts.length && !selected.supportedEfforts.some((option) => option.effort === currentRuntime.effort)) {
+      adjustedEffort = selected.supportedEfforts.some((option) => option.effort === selected.defaultEffort)
+        ? selected.defaultEffort
+        : selected.supportedEfforts[0]?.effort;
+      this.options.stateStore.setEffortOverride(senderId, adjustedEffort);
+    }
+    await this.reply(senderId, [
+      `本会话模型已切换为：${selected?.displayName ?? model}（${model}）`,
+      ...(adjustedEffort ? [`原来的推理强度不受该模型支持，已自动调整为：${formatEffort(adjustedEffort)}`] : []),
+      "下一条消息开始生效。"
+    ].join("\n"));
+  }
+
+  private async handleEffortCommand(senderId: string, arg: string): Promise<void> {
+    const models = await this.listCodexModels();
+    const runtime = await this.effectiveRuntime(senderId);
+    const model = models.find((option) => option.model === runtime.model);
+    const efforts = availableEfforts(model, models);
+    const input = arg.trim();
+    if (!input) {
+      const session = this.options.stateStore.getActiveSession(senderId);
+      await this.reply(senderId, [
+        `当前推理强度：${formatEffort(runtime.effort)}${session?.effort ? "（本会话）" : "（继承 Web/Codex 设置）"}`,
+        `当前模型：${runtime.model ?? "Codex 默认"}`,
+        "",
+        "可用推理强度：",
+        ...efforts.map((effort, index) => `${index + 1}. ${formatEffort(effort)}`),
+        "",
+        "发送 /effort <序号或英文值> 切换；/effort default 恢复继承设置。"
+      ].join("\n"));
+      return;
+    }
+    if (input.toLowerCase() === "default") {
+      this.options.stateStore.setEffortOverride(senderId);
+      const nextRuntime = await this.effectiveRuntime(senderId);
+      await this.reply(senderId, `已恢复继承 Web/Codex 推理强度设置。\n当前推理强度：${formatEffort(nextRuntime.effort)}`);
+      return;
+    }
+    const effort = selectEffort(efforts, input);
+    if (!effort) {
+      await this.reply(senderId, "该模型不支持这个推理强度。发送 /effort 查看可用选项。");
+      return;
+    }
+    this.options.stateStore.setEffortOverride(senderId, effort);
+    await this.reply(senderId, `本会话推理强度已切换为：${formatEffort(effort)}\n下一条消息开始生效。`);
   }
 
   private async promptItemsFromMessage(message: NormalizedWeixinMessage): Promise<PromptBufferItem[]> {
@@ -182,8 +271,8 @@ export class BridgeService {
           prompt: buildPrompt(text, attachments),
           cwd: workspace,
           threadId,
-          model: this.options.config.model,
-          effort: this.options.config.effort
+          model: session.model ?? this.options.config.model,
+          effort: session.effort ?? this.options.config.effort
         });
         console.log(`[codex-weixin] Codex turn completed for ${message.senderId}; text=${result.text.length} chars`);
         if (result.threadId) {
@@ -246,12 +335,7 @@ export class BridgeService {
   private async statusText(senderId: string): Promise<string> {
     const session = this.options.stateStore.getActiveSession(senderId);
     const workspace = session?.workspace ?? this.options.config.defaultCwd;
-    let runtime: { model?: string; effort?: string } = {};
-    try {
-      runtime = await this.runner.getRuntimeInfo(workspace, session?.threadId);
-    } catch (error) {
-      console.warn(`Codex runtime info unavailable: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    const runtime = await this.effectiveRuntime(senderId);
     return [
       "codex-weixin status",
       `sender: ${senderId}`,
@@ -260,9 +344,34 @@ export class BridgeService {
       `thread: ${session?.threadId || "(new)"}`,
       `backend: ${this.options.config.codexBackend}`,
       `exec sandbox: ${this.options.config.codexExecSandbox ?? "(Codex default)"}`,
-      `model: ${this.options.config.model ?? runtime.model ?? "(Codex default)"}`,
-      `effort: ${this.options.config.effort ?? runtime.effort ?? "(Codex default)"}`
+      `model: ${runtime.model ?? "(Codex default)"}`,
+      `effort: ${runtime.effort ?? "(Codex default)"}`
     ].join("\n");
+  }
+
+  private async listCodexModels(): Promise<CodexModelOption[]> {
+    try {
+      return await (this.options.listCodexModels?.() ?? this.runner.listModels());
+    } catch (error) {
+      console.warn(`Codex model list unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
+  }
+
+  private async effectiveRuntime(senderId: string): Promise<CodexRuntimeInfo> {
+    const session = this.options.stateStore.getActiveSession(senderId);
+    const workspace = session?.workspace ?? this.options.config.defaultCwd;
+    let runtime: CodexRuntimeInfo = {};
+    try {
+      runtime = await this.runner.getRuntimeInfo(workspace, session?.threadId);
+    } catch (error) {
+      console.warn(`Codex runtime info unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return {
+      model: session?.model ?? this.options.config.model ?? runtime.model,
+      effort: session?.effort ?? this.options.config.effort ?? runtime.effort,
+      provider: runtime.provider
+    };
   }
 
   private async reply(senderId: string, text: string): Promise<void> {
@@ -311,8 +420,53 @@ function helpText(): string {
     "/status - show current binding",
     "/bind <absolute-path> - bind this chat to a workspace",
     "/new - create a new managed Codex session",
+    "/model [number|model-id|default] - view or switch this session's model",
+    "/effort [number|level|default] - view or switch reasoning effort",
     "/prompt start - buffer multiple WeChat messages",
     "/prompt done - submit buffered prompt",
     "/stop - interrupt the current Codex task"
   ].join("\n");
+}
+
+const fallbackEfforts = ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
+
+function selectModel(models: CodexModelOption[], input: string): CodexModelOption | undefined {
+  if (/^\d+$/.test(input)) {
+    return models[Number(input) - 1];
+  }
+  const normalized = input.toLowerCase();
+  return models.find((model) => model.model.toLowerCase() === normalized);
+}
+
+function isPlausibleModelId(input: string): boolean {
+  return /^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(input);
+}
+
+function availableEfforts(model: CodexModelOption | undefined, models: CodexModelOption[]): string[] {
+  const advertised = model?.supportedEfforts.length
+    ? model.supportedEfforts.map((option) => option.effort)
+    : models.flatMap((option) => option.supportedEfforts.map((effort) => effort.effort));
+  return advertised.length ? [...new Set(advertised)] : fallbackEfforts;
+}
+
+function selectEffort(efforts: string[], input: string): string | undefined {
+  if (/^\d+$/.test(input)) {
+    return efforts[Number(input) - 1];
+  }
+  const normalized = input.toLowerCase();
+  return efforts.find((effort) => effort.toLowerCase() === normalized);
+}
+
+function formatEffort(effort?: string): string {
+  if (!effort) return "Codex 默认";
+  const labels: Record<string, string> = {
+    minimal: "最小",
+    low: "低",
+    medium: "中",
+    high: "高",
+    xhigh: "超高",
+    max: "最大",
+    ultra: "极高"
+  };
+  return labels[effort] ? `${labels[effort]}（${effort}）` : effort;
 }

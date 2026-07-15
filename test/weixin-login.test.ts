@@ -48,6 +48,7 @@ test("login uses current iLink QR GET endpoints and stores the confirmed account
   }));
 
   assert.equal(account.accountId, "account-1");
+  assert.equal(account.botId, "account-1");
   assert.equal(account.baseUrl, "https://region.example");
   assert.equal(account.enabled, true);
   assert.equal(calls[0].url, "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3");

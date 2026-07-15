@@ -9,9 +9,15 @@ export type BuildCodexExecArgsInput = {
   cwd: string;
   threadId?: string;
   sandbox?: CodexExecSandbox;
+  model?: string;
+  effort?: string;
 };
 
 export function buildCodexExecArgs(input: BuildCodexExecArgsInput): string[] {
+  const runtimeArgs = [
+    ...(input.model ? ["--model", input.model] : []),
+    ...(input.effort ? ["-c", `model_reasoning_effort=${JSON.stringify(input.effort)}`] : [])
+  ];
   if (input.threadId) {
     if (input.sandbox) {
       return [
@@ -19,18 +25,20 @@ export function buildCodexExecArgs(input: BuildCodexExecArgsInput): string[] {
         "--skip-git-repo-check",
         "--sandbox",
         input.sandbox,
+        ...runtimeArgs,
         "--json",
         "resume",
         input.threadId,
         input.prompt
       ];
     }
-    return ["exec", "resume", "--skip-git-repo-check", "--json", input.threadId, input.prompt];
+    return ["exec", "resume", "--skip-git-repo-check", ...runtimeArgs, "--json", input.threadId, input.prompt];
   }
   return [
     "exec",
     "--skip-git-repo-check",
     ...(input.sandbox ? ["--sandbox", input.sandbox] : []),
+    ...runtimeArgs,
     "--json",
     input.prompt
   ];

@@ -20,6 +20,7 @@
           <i data-lucide="message-circle"></i>
         </span>
         <span class="brand-name">codex-weixin</span>
+        <span class="brand-version" id="productVersion" aria-label="codex-weixin 版本" hidden></span>
       </a>
       <nav class="view-tabs" aria-label="管理视图">
         <button class="tab is-active" type="button" data-view="accounts">微信账号</button>
@@ -92,6 +93,17 @@
               <i data-lucide="refresh-cw"></i>
             </button>
           </header>
+          <div class="chat-runtime-toolbar" id="sessionRuntimeToolbar" aria-label="当前会话模型设置">
+            <span class="chat-runtime-title"><i data-lucide="sliders-horizontal"></i><span>会话设置</span></span>
+            <label>
+              <span>模型</span>
+              <select id="sessionModelInput" disabled><option value="">继承全局设置</option></select>
+            </label>
+            <label>
+              <span>推理强度</span>
+              <select id="sessionEffortInput" disabled><option value="">继承全局设置</option></select>
+            </label>
+          </div>
           <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
           <form class="chat-composer" id="chatComposer">
             <div class="composer-files" id="composerFiles" aria-live="polite" hidden></div>

@@ -11,7 +11,7 @@ import type { CodexHistoryMessage, CodexModelOption, CodexRuntimeInfo } from "..
 import { HybridCodexRunner } from "../codex/runner.js";
 import { isWorkspaceAllowed, loadConfig, type CodexWeixinConfig } from "../state/config.js";
 import { accountStatePaths, type StatePaths } from "../state/paths.js";
-import { RuntimeStateStore, type ManagedSession } from "../state/runtime-state.js";
+import { RuntimeStateStore, type ManagedSession, type SessionRuntimeOverrides } from "../state/runtime-state.js";
 import {
   deleteAccount,
   listAccounts,
@@ -137,6 +137,15 @@ export class AccountManager {
     await Promise.all(running.map((accountId) => this.startAccount(accountId, false)));
   }
 
+  async refreshAccount(accountId: string): Promise<AccountSummary> {
+    const account = loadAccount(this.options.paths, accountId);
+    const existing = this.entries.get(account.accountId);
+    if (existing?.status === "running" || existing?.status === "starting") {
+      await this.stopAccount(account.accountId, false);
+    }
+    return this.startAccount(account.accountId, false);
+  }
+
   async startAccount(accountId: string, persist = true): Promise<AccountSummary> {
     const account = persist ? setAccountEnabled(this.options.paths, accountId, true) : loadAccount(this.options.paths, accountId);
     const existing = this.entries.get(account.accountId);
@@ -155,6 +164,7 @@ export class AccountManager {
       weixin: client,
       inboundDir: statePaths.inboundDir,
       runner: this.runnerFor(config),
+      listCodexModels: () => this.getCodexModels(),
       onTurnStatus: ({ sessionId, active }) => this.setSessionResponding(account.accountId, sessionId, active)
     });
     const entry: RuntimeEntry = { status: "starting", controller, service, store };
@@ -280,6 +290,11 @@ export class AccountManager {
     return this.sessionSummary(accountId, session, this.isActive(accountId, session.id));
   }
 
+  updateSessionRuntime(accountId: string, sessionId: string, overrides: SessionRuntimeOverrides): AccountSession {
+    const session = this.storeFor(accountId).updateSessionRuntime(sessionId, overrides);
+    return this.sessionSummary(accountId, session, this.isActive(accountId, session.id));
+  }
+
   activateSession(accountId: string, sessionId: string): AccountSession {
     const session = this.storeFor(accountId).activateSession(sessionId);
     return this.sessionSummary(accountId, session, true);
@@ -364,8 +379,8 @@ export class AccountManager {
         prompt: buildPrompt(prompt, attachments, "Web"),
         cwd: session.workspace,
         threadId: session.threadId,
-        model: config.model,
-        effort: config.effort
+        model: session.model ?? config.model,
+        effort: session.effort ?? config.effort
       });
       const threadId = result.threadId ?? session.threadId;
       if (!threadId) {

@@ -31,7 +31,7 @@
 | ✅ | 网页扫码接入 | 显示等待扫码、已扫码、已连接和二维码过期状态。 | 待补：`docs/images/screenshots/wechat-qr-login.png` |
 | ✅ | 会话管理 | 按微信账号分类，查看 Markdown 历史并继续同一 Codex thread；支持新建、重命名、切换、重置和删除。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
 | ✅ | Web 文本与附件 | 一次发送文本和最多 10 个文件（合计 50 MB），历史中可播放、预览或下载媒体。 | 待补：`docs/images/screenshots/web-attachments.png` |
-| ✅ | 微信私聊控制 | 支持普通消息和 `/status`、`/new`、`/bind`、`/prompt start`、`/prompt done`、`/stop`。 | 待补：`docs/images/screenshots/wechat-chat.png` |
+| ✅ | 微信私聊控制 | 支持普通消息和 `/status`、`/new`、`/bind`、`/model`、`/effort`、`/prompt start`、`/prompt done`、`/stop`。 | 待补：`docs/images/screenshots/wechat-chat.png` |
 | ✅ | 微信多媒体输入 | 接收语音转写、图片、音频、视频和文件，并以本机附件交给 Codex。 | 待补：`docs/images/screenshots/wechat-media-input.png` |
 | ✅ | 文件回传微信 | Codex 可把本机图片、视频和文件作为微信原生消息发回。 | 待补：`docs/images/screenshots/wechat-media-output.png` |
 | ✅ | 模型和推理强度 | 从 app-server 读取模型能力并通过下拉列表切换；IkunCoding 支持 GPT-5.6 Sol、Terra 和 Luna。 | 待补：`docs/images/screenshots/web-model-settings.png` |
@@ -89,15 +89,15 @@ npm start
 4. 回到“微信账号”，允许页面中出现的待授权联系人。
 5. 再次从微信发送消息，Codex 会在默认工作目录中开始处理。
 
-继续添加账号时重复扫码即可。每个账号都有独立的轮询任务、联系人授权、入站文件和会话状态；单个账号发生错误不会停止其他账号。
+继续添加账号时重复扫码即可。每个账号都有独立的轮询任务、联系人授权、入站文件和会话状态；单个账号发生错误不会停止其他账号。同一个微信账号因登录过期等原因重新扫码时，会刷新原账号凭据并保留本机备注、授权和会话，不会创建新的空账号。
 
 ## 会话管理
 
 “会话”页面只管理由本服务创建和使用的 Codex 会话，不扫描或接管其他终端产生的全部 Codex 历史记录。
 
-选择一个会话后，右侧会从 Codex 自身保存的 thread 中读取历史用户消息和最终回复。可以直接在页面底部继续聊天，并通过回形针按钮将文本提示词和多个文件作为同一个 turn 发送；Web 和微信共用同一个 thread，上下文会保持连续。上传文件按微信账号和会话隔离保存在 `~/.codex-weixin/inbound/`，每次最多 10 个、合计不超过 50 MB。
+选择一个会话后，右侧会从 Codex 自身保存的 thread 中读取历史用户消息和最终回复。聊天标题下方可以为当前会话选择模型和推理强度，或继续继承全局设置；这与微信 `/model`、`/effort` 共用同一份会话配置。可以直接在页面底部继续聊天，并通过回形针按钮将文本提示词和多个文件作为同一个 turn 发送；Web 和微信共用同一个 thread，上下文会保持连续。上传文件按微信账号和会话隔离保存在 `~/.codex-weixin/inbound/`，每次最多 10 个、合计不超过 50 MB。
 
-页面不显示 `@im.bot`、`@im.wechat` 和 Codex thread id。前两者是微信 iLink 用于账号、联系人路由的内部标识，并不是昵称。可以在“微信账号”页面给账号设置只保存在本机的备注；备注会同步用于会话标签。未设置备注时才使用“微信账号 1”这类默认名称。当前扫码和消息接口没有提供微信昵称、头像或个人资料查询能力，因此页面使用默认图标；这些内部标识仍只在本机状态文件中保存，以保证消息能投递到正确账号和联系人。
+页面默认使用账号备注，不把内部 ID 当作账号名称。展开账号卡片中的“账号 ID”可以查看 iLink Bot ID 和 User ID；Codex thread id 仍不在普通页面显示。可以在“微信账号”页面给账号设置只保存在本机的备注；备注会同步用于会话标签。未设置备注时才使用“微信账号 1”这类默认名称。当前扫码和消息接口没有提供微信昵称、头像或个人资料查询能力，因此页面使用默认图标。
 
 - 每个已授权微信账号有一个当前活动会话，也可以拥有多个命名会话。
 - “切换”决定该联系人下一条微信消息继续哪个 Codex thread。
@@ -112,6 +112,10 @@ npm start
 /status                       查看当前会话、工作目录、thread、backend、实际模型和推理强度
 /bind <absolute-path>          绑定到允许列表内的工作目录
 /new                          创建新的受管 Codex 会话
+/model                        查看当前模型和可用模型
+/model <序号|模型 ID|default>  切换当前会话模型，或恢复继承设置
+/effort                       查看当前模型支持的推理强度
+/effort <序号|强度|default>    切换当前会话推理强度，或恢复继承设置
 /prompt start                 开始缓冲多条微信消息
 /prompt done                  将缓冲内容作为一次 Codex turn 提交
 /stop                         中断当前 Codex 任务
@@ -147,7 +151,9 @@ Codex 可以在最终回复中声明需要发送的本机文件：
 
 “设置”页面会从 Codex app-server 读取可用模型和各模型支持的推理强度。选择“沿用 Codex 设置”时使用 Codex 自身配置；选择具体模型或推理强度并保存后，后续 Web 和微信消息都会使用该配置。
 
-IkunCoding 提供方会额外显示 `gpt-5.6-sol`、`gpt-5.6-terra` 和 `gpt-5.6-luna`。切换到其他模型后，这三项仍会保留在下拉列表中。微信发送 `/status` 可以查看当前生效的模型和推理强度。
+微信中发送 `/model` 或 `/effort` 可以查看带序号的选项，再用序号或英文 ID 切换。微信端设置只覆盖当前受管会话，不影响其他微信账号、联系人或会话；发送 `/model default`、`/effort default` 可恢复继承 Web/Codex 设置。Web 继续该会话时也会沿用这份会话设置。
+
+IkunCoding 提供方会额外显示 `gpt-5.6-sol`、`gpt-5.6-terra` 和 `gpt-5.6-luna`。切换到其他模型后，这三项仍会保留在下拉列表和微信 `/model` 列表中。微信发送 `/status` 可以查看当前生效的模型和推理强度。
 
 ## 本地数据
 

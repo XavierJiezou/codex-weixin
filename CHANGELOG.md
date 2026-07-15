@@ -2,6 +2,18 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.3] - 2026-07-15
+
+### Added
+
+- Added session-scoped `/model` and `/effort` WeChat commands with numbered capability-aware choices, persistent overrides, and `default` inheritance.
+- Passed session model and reasoning-effort overrides through both app-server and `codex exec` fallback turns, including Web continuation of the same session.
+- Added expandable Bot ID and User ID details to each Web account card, displayed the codex-weixin package version in the header, and added session-level model and reasoning-effort selectors to Web chat.
+
+### Fixed
+
+- Reused the existing local account when the same WeChat identity scans again with a new iLink bot ID, preserving its remark, authorization, sessions, and inbound state while refreshing credentials.
+
 ## [0.2.2] - 2026-07-14
 
 ### Fixed
@@ -47,6 +59,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.3]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.3
 [0.2.2]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.2
 [0.2.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.1
 [0.2.0]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.0

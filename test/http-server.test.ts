@@ -38,6 +38,7 @@ test("local API redacts credentials and protects mutations", async (t) => {
     paths,
     accountManager: manager,
     port: 0,
+    productVersion: "9.8.7",
     codexCheck: async () => ({ ready: true, version: "codex-cli test" }),
     codexRuntimeCheck: async () => ({ model: "runtime-model", effort: "high" }),
     codexModelsCheck: async () => [{
@@ -55,6 +56,7 @@ test("local API redacts credentials and protects mutations", async (t) => {
   assert.equal(bootstrapResponse.status, 200);
   const bootstrap = await bootstrapResponse.json() as {
     product: string;
+    version: string;
     requestToken: string;
     accounts: Array<Record<string, unknown>>;
     codex: { ready: boolean; version: string };
@@ -62,6 +64,7 @@ test("local API redacts credentials and protects mutations", async (t) => {
     codexModels: Array<{ model: string }>;
   };
   assert.equal(bootstrap.product, "codex-weixin");
+  assert.equal(bootstrap.version, "9.8.7");
   assert.equal(bootstrap.accounts[0].token, undefined);
   assert.deepEqual(bootstrap.codex, { ready: true, version: "codex-cli test" });
   assert.deepEqual(bootstrap.codexRuntime, { model: "runtime-model", effort: "high" });
@@ -115,8 +118,28 @@ test("local API redacts credentials and protects mutations", async (t) => {
   assert.equal(authorized.status, 201);
 
   const sessionsResponse = await fetch(`${server.url}/api/sessions`);
-  const sessions = await sessionsResponse.json() as { sessions: Array<{ title: string; active: boolean }> };
+  let sessions = await sessionsResponse.json() as { sessions: Array<{ id: string; title: string; active: boolean; model?: string; effort?: string }> };
   assert.deepEqual(sessions.sessions.map((session) => [session.title, session.active]), [["Web session", true]]);
+
+  const session = sessions.sessions[0];
+  const runtimeUpdate = await fetch(`${server.url}/api/sessions/account-one/${encodeURIComponent(session.id)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Codex-Weixin-Token": bootstrap.requestToken,
+      Origin: server.url
+    },
+    body: JSON.stringify({ model: "gpt-session", effort: "high" })
+  });
+  assert.equal(runtimeUpdate.status, 200);
+  assert.deepEqual(
+    await runtimeUpdate.json() as { session: { model: string; effort: string } },
+    { session: { ...(manager.listSessions()[0]), model: "gpt-session", effort: "high" } }
+  );
+
+  sessions = await (await fetch(`${server.url}/api/sessions`)).json() as typeof sessions;
+  assert.equal(sessions.sessions[0].model, "gpt-session");
+  assert.equal(sessions.sessions[0].effort, "high");
 });
 
 test("session message API reads history and continues chat with mutation protection", async (t) => {

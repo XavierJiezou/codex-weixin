@@ -40,6 +40,51 @@ test("places the configured sandbox before the resume subcommand", () => {
   }
 });
 
+test("passes model and reasoning effort to new and resumed exec turns", () => {
+  assert.deepEqual(
+    buildCodexExecArgs({
+      prompt: "hello",
+      cwd: "/tmp/project",
+      model: "gpt-5.6-sol",
+      effort: "xhigh"
+    }),
+    [
+      "exec",
+      "--skip-git-repo-check",
+      "--model",
+      "gpt-5.6-sol",
+      "-c",
+      'model_reasoning_effort="xhigh"',
+      "--json",
+      "hello"
+    ]
+  );
+  assert.deepEqual(
+    buildCodexExecArgs({
+      prompt: "continue",
+      cwd: "/tmp/project",
+      threadId: "abc",
+      sandbox: "workspace-write",
+      model: "gpt-5.6-terra",
+      effort: "high"
+    }),
+    [
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "workspace-write",
+      "--model",
+      "gpt-5.6-terra",
+      "-c",
+      'model_reasoning_effort="high"',
+      "--json",
+      "resume",
+      "abc",
+      "continue"
+    ]
+  );
+});
+
 test("explains how to recover from the Windows background sandbox error", () => {
   const error = formatCodexExecFailure(
     1,

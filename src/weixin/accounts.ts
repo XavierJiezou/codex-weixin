@@ -6,6 +6,7 @@ import type { StatePaths } from "../state/paths.js";
 
 export type WeixinAccount = {
   accountId: string;
+  botId?: string;
   token: string;
   baseUrl: string;
   cdnBaseUrl: string;
@@ -25,6 +26,39 @@ export function normalizeAccountId(raw: string): string {
 export function saveAccount(paths: StatePaths, account: WeixinAccount): void {
   ensureDir(paths.accountsDir);
   writeJsonFile(path.join(paths.accountsDir, `${normalizeAccountId(account.accountId)}.json`), account);
+}
+
+export type SaveScannedAccountResult = {
+  account: WeixinAccount;
+  reusedExisting: boolean;
+};
+
+export function saveScannedAccount(
+  paths: StatePaths,
+  scanned: WeixinAccount,
+  targetAccountId?: string
+): SaveScannedAccountResult {
+  const accounts = listAccounts(paths);
+  const target = targetAccountId ? loadAccount(paths, targetAccountId) : undefined;
+  if (target?.userId && scanned.userId && target.userId !== scanned.userId) {
+    throw new Error("The scanned WeChat account does not match the existing account");
+  }
+  const exact = accounts.find((account) => account.accountId === scanned.accountId);
+  const sameUsers = scanned.userId
+    ? accounts.filter((account) => account.userId === scanned.userId)
+    : [];
+  const existing = target ?? exact ?? (sameUsers.length === 1 ? sameUsers[0] : undefined);
+  const botId = scanned.botId ?? scanned.accountId;
+  const account: WeixinAccount = existing ? {
+    ...scanned,
+    accountId: existing.accountId,
+    botId,
+    userId: scanned.userId ?? existing.userId,
+    ...(existing.displayName ? { displayName: existing.displayName } : {}),
+    enabled: true
+  } : { ...scanned, botId };
+  saveAccount(paths, account);
+  return { account, reusedExisting: Boolean(existing) };
 }
 
 export function listAccounts(paths: StatePaths): WeixinAccount[] {
