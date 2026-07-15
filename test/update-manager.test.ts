@@ -3,7 +3,10 @@ import test from "node:test";
 
 import {
   buildNpmInstallCommand,
+  describeInstallFailure,
   isNewerVersion,
+  normalizeProcessExitCode,
+  releaseRuntimeDirectoryLock,
   resolveNpmInstallPrefix,
   UpdateManager
 } from "../src/server/update-manager.js";
@@ -190,6 +193,36 @@ test("resolves the npm prefix that owns the active package on macOS and Windows"
     "C:\\Users\\THU\\work\\codex-weixin-runtime"
   );
   assert.equal(resolveNpmInstallPrefix("/workspace/codex-weixin", "darwin"), undefined);
+});
+
+test("releases a Windows cwd lock only when the service runs inside its package", () => {
+  const changedDirectories: string[] = [];
+  assert.equal(releaseRuntimeDirectoryLock("C:\\Users\\THU\\work\\codex-weixin-runtime", {
+    currentWorkingDirectory: "C:\\Users\\THU\\work\\codex-weixin-runtime\\node_modules\\codex-weixin\\dist\\server",
+    platform: "win32",
+    chdir: (directory) => changedDirectories.push(directory)
+  }), true);
+  assert.deepEqual(changedDirectories, ["C:\\Users\\THU\\work\\codex-weixin-runtime"]);
+
+  assert.equal(releaseRuntimeDirectoryLock("C:\\Users\\THU\\work\\codex-weixin-runtime", {
+    currentWorkingDirectory: "C:\\Users\\THU\\.codex-weixin",
+    platform: "win32",
+    chdir: (directory) => changedDirectories.push(directory)
+  }), false);
+  assert.equal(changedDirectories.length, 1);
+});
+
+test("converts unsigned Windows npm exit codes back to signed libuv errors", () => {
+  assert.equal(normalizeProcessExitCode(4294963214, "win32"), -4082);
+  assert.equal(normalizeProcessExitCode(-4082, "win32"), -4082);
+  assert.equal(normalizeProcessExitCode(1, "win32"), 1);
+  assert.equal(normalizeProcessExitCode(4294963214, "darwin"), 4294963214);
+  assert.equal(normalizeProcessExitCode(null, "win32"), null);
+  assert.equal(
+    describeInstallFailure(4294963214, "", "win32"),
+    "npm 更新失败：运行目录正被占用（EBUSY，退出码 -4082）"
+  );
+  assert.match(describeInstallFailure(1, "npm ERR! code EBUSY", "win32"), /EBUSY.*退出码 1/);
 });
 
 test("rejects Web installation when running from a source checkout", async () => {

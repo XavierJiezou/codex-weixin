@@ -2,6 +2,14 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.0] - 2026-07-16
+
+### Fixed
+
+- Fixed Windows npm self-updates failing with `EBUSY` when the service process used the active `node_modules/codex-weixin` directory as its working directory.
+- Moved the parent service cwd out of the package tree before installation and started npm from the owning runtime prefix, allowing Windows to rename and replace the package.
+- Converted unsigned Windows process exit codes such as `4294963214` back to signed libuv values and reported this case as `-4082 / EBUSY`.
+
 ## [0.2.9] - 2026-07-15
 
 ### Changed
@@ -127,6 +135,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.0]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.0
 [0.2.9]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.9
 [0.2.8]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.8
 [0.2.7]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.7

@@ -12,7 +12,7 @@ The service must update consistently on macOS, Linux, and Windows without changi
 
 ## Decision
 
-When the running package path matches `<prefix>/node_modules/codex-weixin`, install the selected version with npm into that same prefix. After npm exits successfully, verify that the package version and server entry point under that prefix match the requested release. Restart from the unchanged absolute entry path only after verification succeeds.
+When the running package path matches `<prefix>/node_modules/codex-weixin`, install the selected version with npm into that same prefix. If the service process currently uses the package directory or one of its descendants as its working directory, first move the process working directory to `<prefix>` so Windows releases the directory lock. The npm child also starts from `<prefix>`. After npm exits successfully, verify that the package version and server entry point under that prefix match the requested release. Restart from the unchanged absolute entry path only after verification succeeds.
 
 Reject Web installation from a source checkout or any layout that is not an npm-owned `node_modules` runtime. Users in that mode receive an actionable error instead of a false successful installation into an unrelated global location.
 
@@ -23,6 +23,7 @@ Reject Web installation from a source checkout or any layout that is not an npm-
 - Global and isolated local npm runtimes update the package that is actually running.
 - The existing restart helper can safely reuse the same entry path.
 - A successful response now proves that the target runtime contains the requested version.
+- Windows can rename and replace the active package because neither the parent service nor npm keeps it as the current working directory.
 - Source development trees are never mutated by the Web updater.
 
 ### Negative

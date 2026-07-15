@@ -242,6 +242,42 @@ export function resolveNpmInstallPrefix(
   return pathApi.dirname(nodeModulesDir);
 }
 
+export function releaseRuntimeDirectoryLock(
+  installPrefix: string,
+  options: {
+    currentWorkingDirectory?: string;
+    platform?: NodeJS.Platform;
+    chdir?: (directory: string) => void;
+  } = {}
+): boolean {
+  const platform = options.platform ?? process.platform;
+  const pathApi = platform === "win32" ? path.win32 : path.posix;
+  const safePrefix = requireInstallPrefix(installPrefix, platform);
+  const comparablePrefix = resolveComparablePath(safePrefix, platform, pathApi);
+  const currentWorkingDirectory = resolveComparablePath(
+    options.currentWorkingDirectory ?? process.cwd(),
+    platform,
+    pathApi
+  );
+  const packageRoot = pathApi.join(comparablePrefix, "node_modules", "codex-weixin");
+  const relative = pathApi.relative(packageRoot, currentWorkingDirectory);
+  const insidePackage = relative === ""
+    || (relative !== ".." && !relative.startsWith(`..${pathApi.sep}`) && !pathApi.isAbsolute(relative));
+  if (!insidePackage) return false;
+  (options.chdir ?? process.chdir)(safePrefix);
+  return true;
+}
+
+export function normalizeProcessExitCode(
+  code: number | null,
+  platform: NodeJS.Platform = process.platform
+): number | null {
+  if (code === null) return null;
+  return platform === "win32" && code > 0x7fff_ffff
+    ? code - 0x1_0000_0000
+    : code;
+}
+
 async function installCurrentRuntimeVersion(
   version: string,
   registry: UpdateRegistryId,
@@ -255,6 +291,7 @@ async function installCurrentRuntimeVersion(
   if (!options.installPrefix) {
     throw new Error("源码运行方式不支持网页自动安装，请更新 Git 源码、执行 npm install 和 npm run build 后重启");
   }
+  releaseRuntimeDirectoryLock(options.installPrefix, { platform: options.platform });
   const command = buildNpmInstallCommand(version, registry, {
     installPrefix: options.installPrefix,
     platform: options.platform,
@@ -263,6 +300,7 @@ async function installCurrentRuntimeVersion(
   });
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command.command, command.args, {
+      cwd: options.installPrefix,
       env: options.env,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
@@ -298,12 +336,20 @@ async function installCurrentRuntimeVersion(
         }
         return;
       }
-      const permissionHint = /EACCES|EPERM|permission/i.test(output)
-        ? " npm does not have permission to update the current codex-weixin runtime."
-        : "";
-      reject(new Error(`npm update failed with exit code ${code ?? "unknown"}.${permissionHint}`));
+      reject(new Error(describeInstallFailure(code, output, options.platform)));
     }));
   });
+}
+
+export function describeInstallFailure(code: number | null, output: string, platform: NodeJS.Platform): string {
+  const normalizedCode = normalizeProcessExitCode(code, platform);
+  if (/EBUSY|resource busy/i.test(output) || (platform === "win32" && normalizedCode === -4082)) {
+    return `npm 更新失败：运行目录正被占用（EBUSY，退出码 ${normalizedCode ?? "unknown"}）`;
+  }
+  const permissionHint = /EACCES|EPERM|permission/i.test(output)
+    ? " npm does not have permission to update the current codex-weixin runtime."
+    : "";
+  return `npm update failed with exit code ${normalizedCode ?? "unknown"}.${permissionHint}`;
 }
 
 function verifyInstalledRuntime(installPrefix: string, version: string): void {
@@ -347,6 +393,20 @@ function requireInstallPrefix(value: unknown, platform: NodeJS.Platform): string
     throw new Error("Invalid npm install prefix");
   }
   return pathApi.resolve(value);
+}
+
+function resolveComparablePath(
+  value: string,
+  platform: NodeJS.Platform,
+  pathApi: typeof path.posix | typeof path.win32
+): string {
+  const resolved = pathApi.resolve(value);
+  if (platform !== process.platform) return resolved;
+  try {
+    return fs.realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
 }
 
 function parseStableVersion(value: string): [number, number, number] {
