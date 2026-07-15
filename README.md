@@ -40,7 +40,7 @@
 | ✅ | 过程进度 | 默认开启；Codex 处理过程实时发送到微信，并在 Web 中折叠显示处理用时，最终答案保持完整。 | 待补：`docs/images/screenshots/web-process-progress.png` |
 | ✅ | 输入状态与去重 | Web 显示“对方正在输入…”，并持久记录同步游标和消息 ID，防止重复回复。 | 待补：`docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server 优先 | 新旧会话优先使用 Codex app-server V2；不可用时自动回退到 `codex exec`。 | 待补：`docs/images/screenshots/wechat-status.png` |
-| ✅ | Web 自动更新 | 后台自动选择 npm 官方源或 npmmirror；发现新版本后可在 Web 安装、重启并恢复连接。 | 待补：`docs/images/screenshots/web-auto-update.png` |
+| ✅ | Web 自动更新 | 后台自动选择 npm 官方源或 npmmirror；支持自动检查和设置页手动检查，并可安装、重启和恢复连接。 | 待补：`docs/images/screenshots/web-auto-update.png` |
 
 ## Web 管理页预览
 

@@ -15,6 +15,7 @@ const state = {
   sendingMessage: false,
   savingSessionRuntime: false,
   updateInfo: null,
+  updateChecking: false,
   updateInstalling: false,
   selectedAccountId: "",
   chatFiles: []
@@ -64,6 +65,8 @@ document.addEventListener("DOMContentLoaded", () => {
     updateProgressDetail: document.querySelector("#updateProgressDetail"),
     updateLaterButton: document.querySelector("#updateLaterButton"),
     updateNowButton: document.querySelector("#updateNowButton"),
+    updateCheckButton: document.querySelector("#updateCheckButton"),
+    settingsVersionValue: document.querySelector("#settingsVersionValue"),
     accountDialog: document.querySelector("#accountDialog"),
     sessionDialog: document.querySelector("#sessionDialog")
   });
@@ -99,6 +102,7 @@ function bindEvents() {
   els.qrDialog.addEventListener("close", stopLoginPoll);
   els.updateLaterButton.addEventListener("click", dismissUpdate);
   els.updateNowButton.addEventListener("click", () => void installUpdate());
+  els.updateCheckButton.addEventListener("click", () => void checkForUpdateNow());
   els.updateDialog.addEventListener("cancel", (event) => {
     event.preventDefault();
     if (!state.updateInstalling) dismissUpdate();
@@ -129,21 +133,52 @@ async function bootstrap() {
 }
 
 async function checkForUpdate() {
-  if (state.updateInstalling) return;
+  if (state.updateInstalling || state.updateChecking) return;
   try {
     const info = await api("/api/update", { token: false });
     if (!info.updateAvailable || !info.latestVersion || dismissedUpdateVersion() === info.latestVersion) {
       return;
     }
-    state.updateInfo = info;
-    els.updateCurrentVersion.textContent = `v${String(info.currentVersion).replace(/^v/i, "")}`;
-    els.updateLatestVersion.textContent = `v${String(info.latestVersion).replace(/^v/i, "")}`;
-    resetUpdateDialog();
-    if (!els.updateDialog.open) els.updateDialog.showModal();
-    drawIcons();
+    showAvailableUpdate(info);
   } catch {
     // Update checks are best-effort and must not interrupt the local management page.
   }
+}
+
+async function checkForUpdateNow() {
+  if (state.updateChecking || state.updateInstalling) return;
+  const label = els.updateCheckButton.querySelector("span");
+  state.updateChecking = true;
+  els.updateCheckButton.disabled = true;
+  els.updateCheckButton.classList.add("is-loading");
+  label.textContent = "检查中";
+  try {
+    const info = await api("/api/update?force=1");
+    if (info.error) throw new Error(info.error);
+    if (info.updateAvailable && info.latestVersion) {
+      showAvailableUpdate(info);
+      return;
+    }
+    const current = String(info.currentVersion || state.version || "").replace(/^v/i, "");
+    toast(current ? `已是最新版本 v${current}` : "已是最新版本");
+  } catch (error) {
+    toast(error.message || "无法检查新版本", true);
+  } finally {
+    state.updateChecking = false;
+    els.updateCheckButton.disabled = false;
+    els.updateCheckButton.classList.remove("is-loading");
+    label.textContent = "检查更新";
+    drawIcons();
+  }
+}
+
+function showAvailableUpdate(info) {
+  state.updateInfo = info;
+  els.updateCurrentVersion.textContent = `v${String(info.currentVersion).replace(/^v/i, "")}`;
+  els.updateLatestVersion.textContent = `v${String(info.latestVersion).replace(/^v/i, "")}`;
+  resetUpdateDialog();
+  if (!els.updateDialog.open) els.updateDialog.showModal();
+  drawIcons();
 }
 
 function dismissUpdate() {
@@ -293,6 +328,7 @@ function renderProductVersion() {
   const version = state.version.trim();
   els.productVersion.hidden = !version;
   els.productVersion.textContent = version ? `v${version.replace(/^v/i, "")}` : "";
+  els.settingsVersionValue.textContent = version ? `v${version.replace(/^v/i, "")}` : "--";
 }
 
 function renderMetrics() {

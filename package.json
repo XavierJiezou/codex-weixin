@@ -1,6 +1,6 @@
 {
   "name": "codex-weixin",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Local multi-account WeChat server for OpenAI Codex.",
   "license": "MIT",
   "author": "Xuechao Zou",

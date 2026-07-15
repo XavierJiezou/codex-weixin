@@ -201,6 +201,19 @@
             </label>
           </div>
         </div>
+        <div class="settings-group">
+          <h2>版本</h2>
+          <div class="settings-update">
+            <span class="settings-update-version">
+              <small>当前版本</small>
+              <strong id="settingsVersionValue">--</strong>
+            </span>
+            <button class="button button-secondary" id="updateCheckButton" type="button">
+              <i data-lucide="refresh-cw"></i>
+              <span>检查更新</span>
+            </button>
+          </div>
+        </div>
         <div class="form-actions">
           <button class="button button-primary" type="submit">
             <i data-lucide="save"></i>
@@ -221,9 +234,9 @@
     </div>
     <div class="modal-body update-modal-body">
       <div class="update-version-flow" aria-label="版本升级">
-        <span><small>当前版本</small><strong id="updateCurrentVersion">--</strong></span>
-        <i data-lucide="arrow-right" aria-hidden="true"></i>
-        <span class="is-latest"><small>最新版本</small><strong id="updateLatestVersion">--</strong></span>
+        <span class="update-version-item"><small>当前版本</small><strong id="updateCurrentVersion">--</strong></span>
+        <span class="update-version-arrow" aria-hidden="true"><i data-lucide="arrow-right"></i></span>
+        <span class="update-version-item is-latest"><small>最新版本</small><strong id="updateLatestVersion">--</strong></span>
       </div>
       <p class="update-description">更新期间微信连接会短暂中断，完成后服务将自动重启并恢复连接。</p>
       <div class="update-progress" id="updateProgress" aria-live="polite" hidden>

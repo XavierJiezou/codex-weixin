@@ -38,7 +38,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | ✅ | Process progress | Enabled by default; Codex progress reaches WeChat immediately and appears in a collapsible Web timeline with elapsed time, while final answers stay intact. | Pending: `docs/images/screenshots/web-process-progress.png` |
 | ✅ | Typing state and deduplication | Web typing state plus persistent sync cursors and message IDs prevent duplicate replies. | Pending: `docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server first | New and resumed sessions prefer Codex app-server V2 and fall back to `codex exec` when unavailable. | Pending: `docs/images/screenshots/wechat-status.png` |
-| ✅ | Web auto-update | Automatically selects npm or npmmirror, then installs, restarts, and reconnects from the Web prompt. | Pending: `docs/images/screenshots/web-auto-update.png` |
+| ✅ | Web auto-update | Automatically selects npm or npmmirror, supports automatic and manual checks in Settings, then installs, restarts, and reconnects. | Pending: `docs/images/screenshots/web-auto-update.png` |
 
 ## Web management preview
 

@@ -258,8 +258,13 @@ h2 { margin: 0; font-size: 19px; line-height: 1.3; }
 .settings-form { border-top: 1px solid var(--ink); }
 .settings-group { padding: 26px 0 30px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 30px; }
 .settings-group h2 { font-size: 14px; }
-.settings-group > label, .field-grid { width: 100%; max-width: 720px; grid-column: 2; }
+.settings-group > label, .field-grid, .settings-update { width: 100%; max-width: 720px; grid-column: 2; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.settings-update { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.settings-update-version { min-width: 0; display: grid; gap: 4px; }
+.settings-update-version small { color: var(--ink-soft); font-size: 9px; font-weight: 700; }
+.settings-update-version strong { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; }
+.button.is-loading svg { animation: spin .8s linear infinite; }
 .toggle-field { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #f8faf8; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .toggle-control { width: 38px; height: 22px; position: relative; flex: 0 0 38px; }
 .toggle-control input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -291,11 +296,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 .update-modal-icon { width: 42px; height: 42px; flex: 0 0 42px; border-radius: var(--radius); color: var(--green-dark); background: var(--green-soft); display: grid; place-items: center; }
 .update-modal-icon svg { width: 21px; height: 21px; }
 .update-modal-body { display: grid; gap: 17px; }
-.update-version-flow { min-height: 86px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--canvas); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; }
-.update-version-flow > span { min-width: 0; }
+.update-version-flow { min-height: 86px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--canvas); display: grid; grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr); align-items: center; gap: 12px; }
+.update-version-item { min-width: 0; }
 .update-version-flow small { margin-bottom: 5px; color: var(--ink-soft); font-size: 9px; font-weight: 750; display: block; }
 .update-version-flow strong { overflow: hidden; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; display: block; }
-.update-version-flow > svg { width: 17px; height: 17px; color: #84908a; }
+.update-version-arrow { width: 100%; color: #7e8b84; display: flex; align-items: center; gap: 5px; }
+.update-version-arrow::before { content: ""; height: 1px; flex: 1; background: #c5cec9; }
+.update-version-arrow svg { width: 15px; height: 15px; flex: 0 0 15px; stroke-width: 1.8; }
+.update-version-flow .is-latest { text-align: right; }
 .update-version-flow .is-latest strong { color: var(--green-dark); }
 .update-description { margin: 0; color: var(--ink-soft); font-size: 11px; line-height: 1.65; }
 .update-progress { min-height: 64px; padding: 12px 14px; border: 1px solid #b9ddc7; border-radius: var(--radius); background: var(--green-soft); display: flex; align-items: center; gap: 13px; }
@@ -383,7 +391,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
   .composer-files { padding-left: 45px; }
   .composer-hint { margin-left: 45px; }
   .settings-group { grid-template-columns: 1fr; gap: 16px; }
-  .settings-group > label, .field-grid { grid-column: 1; }
+  .settings-group > label, .field-grid, .settings-update { grid-column: 1; }
   .field-grid { grid-template-columns: 1fr; }
   .qr-stage { min-height: 342px; padding-inline: 16px; }
   .qr-frame { width: min(280px, calc(100vw - 72px)); height: min(280px, calc(100vw - 72px)); }

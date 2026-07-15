@@ -38,6 +38,7 @@ test("local API redacts credentials and protects mutations", async (t) => {
   const restartRequested = new Promise<string>((resolve) => {
     resolveRestart = resolve;
   });
+  const updateChecks: boolean[] = [];
   const server = await startLocalHttpServer({
     paths,
     accountManager: manager,
@@ -54,13 +55,16 @@ test("local API redacts credentials and protects mutations", async (t) => {
       supportedEfforts: [{ effort: "medium", description: "Balanced" }]
     }],
     updateService: {
-      check: async () => ({
-        currentVersion: "9.8.7",
-        latestVersion: "9.9.0",
-        updateAvailable: true,
-        checkedAt: "2026-07-15T00:00:00.000Z",
-        registry: "npmmirror"
-      }),
+      check: async (force = false) => {
+        updateChecks.push(force);
+        return {
+          currentVersion: "9.8.7",
+          latestVersion: "9.9.0",
+          updateAvailable: true,
+          checkedAt: "2026-07-15T00:00:00.000Z",
+          registry: "npmmirror"
+        };
+      },
       installLatest: async () => ({ version: "9.9.0", registry: "npmmirror" })
     },
     onUpdateInstalled: resolveRestart
@@ -93,6 +97,7 @@ test("local API redacts credentials and protects mutations", async (t) => {
     pageHtml,
     /href="https:\/\/github\.com\/XavierJiezou\/codex-weixin" target="_blank" rel="noopener noreferrer"/
   );
+  assert.match(pageHtml, /id="updateCheckButton"/);
   const faviconResponse = await fetch(`${server.url}/favicon.svg`);
   assert.equal(faviconResponse.status, 200);
   assert.match(faviconResponse.headers.get("content-type") ?? "", /^image\/svg\+xml/);
@@ -106,6 +111,17 @@ test("local API redacts credentials and protects mutations", async (t) => {
     checkedAt: "2026-07-15T00:00:00.000Z",
     registry: "npmmirror"
   });
+  const unauthorizedForcedUpdate = await fetch(`${server.url}/api/update?force=1`);
+  assert.equal(unauthorizedForcedUpdate.status, 403);
+  const forcedUpdateResponse = await fetch(`${server.url}/api/update?force=1`, {
+    headers: {
+      "X-Codex-Weixin-Token": bootstrap.requestToken,
+      Origin: server.url
+    }
+  });
+  assert.equal(forcedUpdateResponse.status, 200);
+  assert.equal((await forcedUpdateResponse.json() as { latestVersion: string }).latestVersion, "9.9.0");
+  assert.deepEqual(updateChecks, [false, true]);
   const unauthorizedUpdate = await fetch(`${server.url}/api/update`, { method: "POST" });
   assert.equal(unauthorizedUpdate.status, 403);
   const installedUpdate = await fetch(`${server.url}/api/update`, {

@@ -147,7 +147,15 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     return;
   }
   if (method === "GET" && url.pathname === "/api/update") {
-    sendJson(response, 200, await context.updateService.check());
+    const force = url.searchParams.get("force") === "1";
+    if (force && (
+      !isAllowedOrigin(request.headers.origin, context.port)
+      || request.headers["x-codex-weixin-token"] !== context.requestToken
+    )) {
+      sendJson(response, 403, { error: "Invalid manual update check" });
+      return;
+    }
+    sendJson(response, 200, await context.updateService.check(force));
     return;
   }
   if (method === "POST" && url.pathname === "/api/update") {

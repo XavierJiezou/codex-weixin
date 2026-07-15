@@ -2,6 +2,16 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.8] - 2026-07-15
+
+### Added
+
+- Added a manual "Check for updates" control to Settings that bypasses the server cache and reports when the installed version is current.
+
+### Changed
+
+- Preserved the existing six-hour automatic update-check interval while refining the update dialog into a balanced, responsive version-flow layout.
+
 ## [0.2.7] - 2026-07-15
 
 ### Added
@@ -100,6 +110,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.8]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.8
 [0.2.7]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.7
 [0.2.6]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.6
 [0.2.5]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.5
