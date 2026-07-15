@@ -11,6 +11,8 @@ export type BuildCodexExecArgsInput = {
   sandbox?: CodexExecSandbox;
   model?: string;
   effort?: string;
+  onDelta?: (delta: string) => Promise<void> | void;
+  onProgress?: (message: string) => Promise<void> | void;
 };
 
 export function buildCodexExecArgs(input: BuildCodexExecArgsInput): string[] {

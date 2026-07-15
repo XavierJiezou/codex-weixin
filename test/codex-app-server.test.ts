@@ -15,9 +15,24 @@ test("uses the Codex V2 initialize, thread, and turn lifecycle", async (t) => {
   });
   t.after(() => runner.close());
 
-  const first = await runner.run({ prompt: "first", cwd: "/tmp/project", model: "test-model", effort: "high" });
+  const deltas: string[] = [];
+  const progress: string[] = [];
+  const first = await runner.run({
+    prompt: "first",
+    cwd: "/tmp/project",
+    model: "test-model",
+    effort: "high",
+    onDelta: async (delta) => {
+      deltas.push(delta);
+    },
+    onProgress: async (message) => {
+      progress.push(message);
+    }
+  });
   assert.equal(first.threadId, "thread-new");
   assert.equal(first.text, "reply:first");
+  assert.deepEqual(deltas, ["reply:", "first"]);
+  assert.deepEqual(progress, ["working:first"]);
   assert.match(first.raw, /item\/completed/);
   assert.match(first.raw, /turn\/completed/);
   assert.deepEqual(await runner.getRuntimeInfo("/tmp/project", "thread-new"), {
@@ -49,6 +64,13 @@ test("uses the Codex V2 initialize, thread, and turn lifecycle", async (t) => {
       role: "user",
       text: "hello history",
       createdAt: "2023-11-14T22:13:20.000Z"
+    },
+    {
+      id: "history-commentary-1",
+      role: "assistant",
+      text: "working",
+      kind: "progress",
+      createdAt: "2023-11-14T22:13:22.000Z"
     },
     {
       id: "history-assistant-1",
@@ -113,4 +135,47 @@ test("auto backend falls back to codex exec for an existing thread", async (t) =
   assert.equal(result.threadId, "thread-existing");
   assert.match(result.text, /used codex exec fallback/i);
   assert.match(result.text, /exec-resumed/);
+});
+
+test("exec backend uses app-server when true streaming is requested", async (t) => {
+  const runner = new HybridCodexRunner({
+    backend: "exec",
+    codexBin: path.join(fixturesDir, "fake-codex-app-server.mjs"),
+    timeoutMs: 2_000
+  });
+  t.after(() => runner.close());
+  const deltas: string[] = [];
+
+  const result = await runner.run({
+    prompt: "stream",
+    cwd: fixturesDir,
+    onDelta: (delta) => {
+      deltas.push(delta);
+    }
+  });
+
+  assert.deepEqual(deltas, ["reply:", "stream"]);
+  assert.equal(result.text, "reply:stream");
+});
+
+test("streaming fallback to exec sends only the final answer", async (t) => {
+  const runner = new HybridCodexRunner({
+    backend: "exec",
+    codexBin: path.join(fixturesDir, "fake-codex-fallback.mjs"),
+    timeoutMs: 2_000
+  });
+  t.after(() => runner.close());
+  const deltas: string[] = [];
+
+  const result = await runner.run({
+    prompt: "stream",
+    cwd: fixturesDir,
+    onDelta: (delta) => {
+      deltas.push(delta);
+    }
+  });
+
+  assert.deepEqual(deltas, []);
+  assert.match(result.text, /used codex exec fallback/i);
+  assert.match(result.text, /exec-new/);
 });

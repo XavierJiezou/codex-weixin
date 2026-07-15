@@ -34,7 +34,8 @@ export class HybridCodexRunner {
   }
 
   async run(input: CodexRunnerInput): Promise<CodexRunResult> {
-    if (this.options.backend === "exec") {
+    const requiresAppServerForStreaming = Boolean(input.onDelta || input.onProgress);
+    if (this.options.backend === "exec" && !requiresAppServerForStreaming) {
       return this.exec.run(input);
     }
     try {
@@ -43,7 +44,11 @@ export class HybridCodexRunner {
       if (this.options.backend === "app-server") {
         throw error;
       }
-      const fallback = await this.exec.run(input);
+      const fallback = await this.exec.run({
+        ...input,
+        onDelta: undefined,
+        onProgress: undefined
+      });
       return {
         ...fallback,
         text: `Warning: Codex app-server was unavailable, used codex exec fallback.\n\n${fallback.text}`

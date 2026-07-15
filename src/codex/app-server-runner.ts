@@ -14,12 +14,15 @@ export type CodexRunnerInput = {
   threadId?: string;
   model?: string;
   effort?: string;
+  onDelta?: (delta: string) => Promise<void> | void;
+  onProgress?: (message: string) => Promise<void> | void;
 };
 
 export type CodexHistoryMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  kind?: "progress";
   createdAt?: string;
 };
 
@@ -63,6 +66,17 @@ type TurnWaiter = {
   timer: NodeJS.Timeout;
 };
 
+type TurnStream = {
+  onDelta?: (delta: string) => Promise<void> | void;
+  onProgress?: (message: string) => Promise<void> | void;
+  chain: Promise<void>;
+};
+
+type QueuedTurnEvent = {
+  type: "delta" | "progress";
+  text: string;
+};
+
 type WireMessage = {
   id?: JsonRpcId;
   method?: string;
@@ -89,6 +103,9 @@ export class AppServerCodexRunner {
   private readonly turnEvents = new Map<string, string[]>();
   private readonly turnTexts = new Map<string, string>();
   private readonly completedTurns = new Map<string, TurnCompletion>();
+  private readonly turnStreams = new Map<string, TurnStream>();
+  private readonly queuedTurnEvents = new Map<string, QueuedTurnEvent[]>();
+  private readonly itemPhasesByTurn = new Map<string, Map<string, string>>();
   private readonly runtimeInfoByThread = new Map<string, CodexRuntimeInfo>();
   private modelOptions?: CodexModelOption[];
 
@@ -128,6 +145,18 @@ export class AppServerCodexRunner {
     }
 
     this.activeTurns.set(threadId, turnId);
+    if (input.onDelta || input.onProgress) {
+      const key = turnKey(threadId, turnId);
+      this.turnStreams.set(key, {
+        onDelta: input.onDelta,
+        onProgress: input.onProgress,
+        chain: Promise.resolve()
+      });
+      for (const event of this.queuedTurnEvents.get(key) ?? []) {
+        this.enqueueTurnEvent(key, event);
+      }
+      this.queuedTurnEvents.delete(key);
+    }
     return this.waitForTurn(threadId, turnId);
   }
 
@@ -341,6 +370,33 @@ export class AppServerCodexRunner {
   }
 
   private handleNotification(method: string, params: Record<string, unknown>, raw: string): void {
+    if (method === "item/started") {
+      const key = turnKeyFromParams(params);
+      const item = params.item as Record<string, unknown> | undefined;
+      const itemId = typeof item?.id === "string" ? item.id : undefined;
+      if (key && itemId && item?.type === "agentMessage" && typeof item.phase === "string") {
+        const phases = this.itemPhasesByTurn.get(key) ?? new Map<string, string>();
+        phases.set(itemId, item.phase);
+        this.itemPhasesByTurn.set(key, phases);
+      }
+      return;
+    }
+
+    if (method === "item/agentMessage/delta") {
+      const key = turnKeyFromParams(params);
+      const itemId = typeof params.itemId === "string" ? params.itemId : undefined;
+      const delta = typeof params.delta === "string" ? params.delta : "";
+      if (!key || !itemId || !delta || this.itemPhasesByTurn.get(key)?.get(itemId) === "commentary") {
+        return;
+      }
+      if (this.turnStreams.has(key)) {
+        this.enqueueTurnEvent(key, { type: "delta", text: delta });
+      } else {
+        this.queueTurnEvent(key, { type: "delta", text: delta });
+      }
+      return;
+    }
+
     if (method === "item/completed") {
       const threadId = typeof params.threadId === "string" ? params.threadId : undefined;
       const turnId = typeof params.turnId === "string" ? params.turnId : undefined;
@@ -351,7 +407,18 @@ export class AppServerCodexRunner {
       this.appendTurnEvent(key, raw);
       const item = params.item as Record<string, unknown> | undefined;
       if (item?.type === "agentMessage" && typeof item.text === "string") {
-        this.turnTexts.set(key, item.text);
+        if (item.phase === "commentary") {
+          const progress = item.text.trim();
+          if (progress) {
+            if (this.turnStreams.has(key)) {
+              this.enqueueTurnEvent(key, { type: "progress", text: progress });
+            } else {
+              this.queueTurnEvent(key, { type: "progress", text: progress });
+            }
+          }
+        } else {
+          this.turnTexts.set(key, item.text);
+        }
       }
       return;
     }
@@ -383,7 +450,7 @@ export class AppServerCodexRunner {
     }
     this.turnWaiters.delete(key);
     clearTimeout(waiter.timer);
-    this.finishTurn(threadId, key, completion, waiter.resolve, waiter.reject);
+    void this.finishTurn(threadId, key, completion, waiter.resolve, waiter.reject);
   }
 
   private waitForTurn(threadId: string, turnId: string): Promise<CodexRunResult> {
@@ -392,7 +459,7 @@ export class AppServerCodexRunner {
     if (completed) {
       this.completedTurns.delete(key);
       return new Promise((resolve, reject) => {
-        this.finishTurn(threadId, key, completed, resolve, reject);
+        void this.finishTurn(threadId, key, completed, resolve, reject);
       });
     }
 
@@ -408,15 +475,20 @@ export class AppServerCodexRunner {
     });
   }
 
-  private finishTurn(
+  private async finishTurn(
     threadId: string,
     key: string,
     completion: TurnCompletion,
     resolve: (value: CodexRunResult) => void,
     reject: (error: Error) => void
-  ): void {
+  ): Promise<void> {
+    const stream = this.turnStreams.get(key);
+    this.turnStreams.delete(key);
+    await stream?.chain;
     this.turnEvents.delete(key);
     this.turnTexts.delete(key);
+    this.queuedTurnEvents.delete(key);
+    this.itemPhasesByTurn.delete(key);
     if (completion.status === "completed") {
       resolve({ text: completion.text, threadId, raw: completion.raw });
       return;
@@ -432,6 +504,25 @@ export class AppServerCodexRunner {
     const events = this.turnEvents.get(key) ?? [];
     events.push(raw);
     this.turnEvents.set(key, events);
+  }
+
+  private queueTurnEvent(key: string, event: QueuedTurnEvent): void {
+    const queued = this.queuedTurnEvents.get(key) ?? [];
+    queued.push(event);
+    this.queuedTurnEvents.set(key, queued);
+  }
+
+  private enqueueTurnEvent(key: string, event: QueuedTurnEvent): void {
+    const stream = this.turnStreams.get(key);
+    if (!stream) return;
+    const callback = event.type === "progress" ? stream.onProgress : stream.onDelta;
+    if (!callback) return;
+    stream.chain = stream.chain
+      .then(() => callback(event.text))
+      .then(() => undefined)
+      .catch((error) => {
+        console.warn(`Codex ${event.type} callback failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
   }
 
   private handleServerRequest(message: WireMessage): void {
@@ -504,9 +595,18 @@ export class AppServerCodexRunner {
     this.turnEvents.clear();
     this.turnTexts.clear();
     this.completedTurns.clear();
+    this.turnStreams.clear();
+    this.queuedTurnEvents.clear();
+    this.itemPhasesByTurn.clear();
     this.runtimeInfoByThread.clear();
     this.modelOptions = undefined;
   }
+}
+
+function turnKeyFromParams(params: Record<string, unknown>): string | undefined {
+  const threadId = typeof params.threadId === "string" ? params.threadId : undefined;
+  const turnId = typeof params.turnId === "string" ? params.turnId : undefined;
+  return threadId && turnId ? turnKey(threadId, turnId) : undefined;
 }
 
 function parseModelOption(value: unknown): CodexModelOption | undefined {
@@ -593,7 +693,6 @@ export function parseThreadHistory(thread: Record<string, unknown> | undefined):
       }
       if (
         item.type === "agentMessage"
-        && item.phase !== "commentary"
         && typeof item.text === "string"
         && item.text.trim()
       ) {
@@ -601,6 +700,7 @@ export function parseThreadHistory(thread: Record<string, unknown> | undefined):
           id,
           role: "assistant",
           text: item.text.trim(),
+          ...(item.phase === "commentary" ? { kind: "progress" as const } : {}),
           ...(assistantCreatedAt ? { createdAt: assistantCreatedAt } : {})
         });
       }

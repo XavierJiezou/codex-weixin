@@ -419,3 +419,121 @@ test("lists and switches model and reasoning effort for the active WeChat sessio
   assert.equal(new RuntimeStateStore(paths).getSession(overriddenSession)?.model, undefined);
   assert.equal(new RuntimeStateStore(paths).getSession(overriddenSession)?.effort, undefined);
 });
+
+test("streams process progress but sends the final WeChat answer as one message", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-stream-command-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const replies: string[] = [];
+  const service = new BridgeService({
+    config: {
+      ...defaultConfig(tmpDir),
+      allowedSenderIds: ["alice@im.wechat"],
+      streamReplies: false
+    },
+    stateStore,
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        replies.push(input.text);
+        return { messageId: "text-message" };
+      }
+    } as never,
+    runner: {
+      async run(input: {
+        onDelta?: (delta: string) => Promise<void>;
+        onProgress?: (message: string) => Promise<void>;
+      }) {
+        assert.equal(input.onDelta, undefined);
+        await input.onProgress?.("正在查询资料。");
+        return {
+          raw: "",
+          threadId: "thread-stream",
+          text: [
+            "第一段。",
+            "",
+            "第二段。",
+            "",
+            "```codex-weixin-actions",
+            '{"send":[]}',
+            "```"
+          ].join("\n")
+        };
+      },
+      async getRuntimeInfo() {
+        return {};
+      },
+      async stop() {}
+    } as never
+  });
+  const send = (id: string, text: string) => service.handleMessage({
+    id,
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text,
+    raw: {}
+  });
+
+  await send("status-default", "/stream");
+  assert.match(replies.at(-1) ?? "", /关闭.*继承全局/);
+  await send("enable", "/stream on");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.streamReplies, true);
+  await send("turn", "开始流式回复");
+  assert.equal(replies.filter((reply) => reply === "【进度】正在查询资料。").length, 1);
+  assert.equal(replies.filter((reply) => reply === "第一段。\n\n第二段。").length, 1);
+  assert.equal(replies.filter((reply) => reply === "第一段。").length, 0);
+  assert.equal(replies.some((reply) => reply.includes("codex-weixin-actions")), false);
+
+  await send("inherit", "/stream default");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.streamReplies, undefined);
+  await send("disable", "/stream off");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.streamReplies, false);
+});
+
+test("preserves the tail of a long final answer with bounded WeChat chunks", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-long-reply-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const replies: string[] = [];
+  const finalText = `${"长回答".repeat(700)}\n\n来源：arXiv 官方作者检索。`;
+  const service = new BridgeService({
+    config: {
+      ...defaultConfig(tmpDir),
+      allowedSenderIds: ["alice@im.wechat"],
+      streamReplies: true
+    },
+    stateStore,
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        replies.push(input.text);
+        return { messageId: `text-${replies.length}` };
+      }
+    } as never,
+    runner: {
+      async run(input: { onProgress?: (message: string) => Promise<void> }) {
+        await input.onProgress?.("正在检索论文。");
+        return { raw: "", threadId: "thread-long", text: finalText };
+      },
+      async getRuntimeInfo() {
+        return {};
+      },
+      async stop() {}
+    } as never
+  });
+
+  await service.handleMessage({
+    id: "long",
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text: "查询论文",
+    raw: {}
+  });
+
+  assert.equal(replies[0], "【进度】正在检索论文。");
+  const finalChunks = replies.slice(1);
+  assert.equal(finalChunks.length, 2);
+  assert.equal(finalChunks.every((chunk) => chunk.length <= 1_800), true);
+  assert.equal(finalChunks.join(""), finalText);
+  assert.match(finalChunks.at(-1) ?? "", /来源：arXiv 官方作者检索。$/);
+});

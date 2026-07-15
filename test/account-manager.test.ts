@@ -226,6 +226,27 @@ test("uses WeChat session model overrides when continuing the same session from 
   assert.equal(runs[0].effort, "high");
 });
 
+test("streams Web progress without exposing final-answer deltas", async (t) => {
+  const { manager, root, setRunHandler } = setup(t);
+  const session = manager.createSession("account-one", "alice@im.wechat", root, "Streaming chat");
+  manager.updateSessionRuntime("account-one", session.id, { streamReplies: true });
+  const progress: string[] = [];
+  setRunHandler(async (input) => {
+    assert.equal(input.onDelta, undefined);
+    await (input.onProgress as ((message: string) => Promise<void>) | undefined)?.("正在处理");
+    return { raw: "", text: "第一段。\n\n第二段。", threadId: "thread-stream-web" };
+  });
+
+  assert.equal(manager.isSessionStreamEnabled("account-one", session.id), true);
+  await manager.continueSession("account-one", session.id, "开始", [], async (message) => {
+    progress.push(message);
+  });
+  assert.deepEqual(progress, ["正在处理"]);
+
+  manager.updateSessionRuntime("account-one", session.id, { streamReplies: false });
+  assert.equal(manager.isSessionStreamEnabled("account-one", session.id), false);
+});
+
 test("stores Web uploads per session and exposes them in user history", async (t) => {
   const { manager, root, runs, history } = setup(t);
   const session = manager.createSession("account-one", "alice@im.wechat", root, "Upload chat");

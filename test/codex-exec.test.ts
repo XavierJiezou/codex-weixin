@@ -154,3 +154,25 @@ test("stops the active codex exec fallback process", async (t) => {
   await runner.stop();
   await assert.rejects(run, /exited with code/i);
 });
+
+test("does not misreport completed exec messages as token deltas", async (t) => {
+  const deltas: string[] = [];
+  const runner = new CodexExecRunner({
+    codexBin: path.join(fixturesDir, "fake-codex-exec-stream.mjs"),
+    timeoutMs: 2_000
+  });
+  t.after(() => runner.close());
+
+  const result = await runner.run({
+    prompt: "stream",
+    cwd: fixturesDir,
+    onDelta: async (delta) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      deltas.push(delta);
+    }
+  });
+
+  assert.deepEqual(deltas, []);
+  assert.equal(result.text, "第一段。\n\n第二段。");
+  assert.equal(result.threadId, "thread-exec-stream");
+});

@@ -295,6 +295,11 @@ export class AccountManager {
     return this.sessionSummary(accountId, session, this.isActive(accountId, session.id));
   }
 
+  isSessionStreamEnabled(accountId: string, sessionId: string): boolean {
+    const session = requireSession(this.storeFor(accountId), sessionId);
+    return session.streamReplies ?? this.configProvider().streamReplies;
+  }
+
   activateSession(accountId: string, sessionId: string): AccountSession {
     const session = this.storeFor(accountId).activateSession(sessionId);
     return this.sessionSummary(accountId, session, true);
@@ -363,7 +368,8 @@ export class AccountManager {
     accountId: string,
     sessionId: string,
     text: string,
-    uploads: SessionUpload[] = []
+    uploads: SessionUpload[] = [],
+    onProgress?: (message: string) => Promise<void> | void
   ): Promise<SessionChatResult> {
     const prompt = text.trim();
     if (!prompt && !uploads.length) {
@@ -380,7 +386,10 @@ export class AccountManager {
         cwd: session.workspace,
         threadId: session.threadId,
         model: session.model ?? config.model,
-        effort: session.effort ?? config.effort
+        effort: session.effort ?? config.effort,
+        ...((session.streamReplies ?? config.streamReplies) && onProgress
+          ? { onProgress }
+          : {})
       });
       const threadId = result.threadId ?? session.threadId;
       if (!threadId) {

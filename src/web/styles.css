@@ -165,7 +165,7 @@ h2 { margin: 0; font-size: 19px; line-height: 1.3; }
 .chat-header { min-height: 82px; padding: 17px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .chat-header h2 { max-width: 620px; overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
 .chat-context { max-width: 720px; margin: 5px 0 0; overflow: hidden; color: var(--ink-soft); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.chat-runtime-toolbar { min-height: 54px; padding: 9px 20px; border-bottom: 1px solid var(--line); background: #f7f9f7; display: grid; grid-template-columns: auto minmax(190px, 1fr) minmax(170px, .72fr); align-items: center; gap: 14px; }
+.chat-runtime-toolbar { min-height: 54px; padding: 9px 20px; border-bottom: 1px solid var(--line); background: #f7f9f7; display: grid; grid-template-columns: auto minmax(170px, 1fr) minmax(150px, .72fr) minmax(130px, .55fr); align-items: center; gap: 12px; }
 .chat-runtime-title { color: var(--ink-soft); display: inline-flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; }
 .chat-runtime-title svg { width: 14px; height: 14px; color: var(--green-dark); }
 .chat-runtime-toolbar label { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 7px; }
@@ -176,6 +176,16 @@ h2 { margin: 0; font-size: 19px; line-height: 1.3; }
 .chat-message.is-user { margin-left: auto; justify-items: end; }
 .chat-message.is-assistant { margin-right: auto; justify-items: start; }
 .chat-message.has-attachments { width: min(78%, 720px); }
+.chat-progress-group { width: min(78%, 720px); margin: 0 0 22px; color: var(--ink-soft); }
+.chat-progress-group summary { min-height: 32px; padding: 0 3px; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; font-size: 10px; font-weight: 700; }
+.chat-progress-group summary::-webkit-details-marker { display: none; }
+.chat-progress-group summary:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+.progress-summary-title { color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+.progress-summary-title svg { width: 14px; height: 14px; color: var(--green-dark); transition: transform 160ms ease; }
+.chat-progress-group[open] .progress-summary-title svg { transform: rotate(90deg); }
+.progress-list { margin: 5px 0 0 8px; padding: 8px 12px 8px 24px; border-left: 2px solid #b9c9c0; font-size: 11px; line-height: 1.6; }
+.progress-list li + li { margin-top: 7px; }
+.progress-list p { margin: 0; }
 .message-meta { padding: 0 3px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; font-size: 9px; font-weight: 750; }
 .message-meta time { font-weight: 550; }
 .message-bubble { max-width: 100%; padding: 13px 15px; border: 1px solid var(--line); border-radius: 7px; background: white; box-shadow: 0 4px 14px rgb(23 34 29 / 6%); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
@@ -250,6 +260,14 @@ h2 { margin: 0; font-size: 19px; line-height: 1.3; }
 .settings-group h2 { font-size: 14px; }
 .settings-group > label, .field-grid { width: 100%; max-width: 720px; grid-column: 2; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.toggle-field { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #f8faf8; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.toggle-control { width: 38px; height: 22px; position: relative; flex: 0 0 38px; }
+.toggle-control input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.toggle-control > span { position: absolute; inset: 0; border: 1px solid #aeb8b2; border-radius: 11px; background: #dfe4e1; transition: background-color .16s ease, border-color .16s ease; }
+.toggle-control > span::after { content: ""; width: 16px; height: 16px; position: absolute; left: 2px; top: 2px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgb(23 34 29 / 24%); transition: transform .16s ease; }
+.toggle-control input:checked + span { border-color: var(--green-dark); background: var(--green); }
+.toggle-control input:checked + span::after { transform: translateX(16px); }
+.toggle-control input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--focus) 30%, transparent); outline-offset: 2px; }
 label { min-width: 0; display: grid; gap: 8px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
 .field-hint { color: var(--ink-soft); font-size: 10px; font-weight: 500; line-height: 1.5; }
 .effective-setting { min-width: 0; display: flex; align-items: center; gap: 7px; }

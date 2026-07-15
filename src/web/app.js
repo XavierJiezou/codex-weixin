@@ -25,6 +25,7 @@ const MAX_CHAT_FILE_BYTES = 50 * 1024 * 1024;
 const DISMISSED_UPDATE_KEY = "codex-weixin.dismissed-update";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const UPDATE_RECONNECT_TIMEOUT_MS = 90 * 1000;
+let streamingRenderFrame = 0;
 
 const els = {};
 
@@ -48,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sessionRuntimeToolbar: document.querySelector("#sessionRuntimeToolbar"),
     sessionModelInput: document.querySelector("#sessionModelInput"),
     sessionEffortInput: document.querySelector("#sessionEffortInput"),
+    sessionStreamInput: document.querySelector("#sessionStreamInput"),
     runningAccountMetric: document.querySelector("#runningAccountMetric"),
     sessionMetric: document.querySelector("#sessionMetric"),
     workspaceMetric: document.querySelector("#workspaceMetric"),
@@ -80,6 +82,7 @@ function bindEvents() {
   document.querySelector("#modelInput").addEventListener("change", () => renderEffortOptions(""));
   els.sessionModelInput.addEventListener("change", () => void handleSessionModelChange());
   els.sessionEffortInput.addEventListener("change", () => void saveSessionRuntimeSettings());
+  els.sessionStreamInput.addEventListener("change", () => void saveSessionRuntimeSettings());
   document.querySelector("#accountForm").addEventListener("submit", (event) => void saveAccountRemark(event));
   document.querySelector("#sessionForm").addEventListener("submit", (event) => void saveSession(event));
   document.querySelector("#sessionSenderInput").addEventListener("change", updateNewSessionDefaultTitle);
@@ -441,6 +444,7 @@ function renderSettings() {
   document.querySelector("#allowedWorkspacesInput").value = (state.config.allowedWorkspaces || []).join("\n");
   document.querySelector("#backendInput").value = state.config.codexBackend || "auto";
   document.querySelector("#sandboxInput").value = state.config.codexExecSandbox || "";
+  document.querySelector("#streamRepliesInput").checked = Boolean(state.config.streamReplies);
   renderModelOptions();
   document.querySelector("#effectiveModelValue").textContent = state.codexRuntime?.model || state.config.model || "Codex 默认";
   document.querySelector("#effectiveEffortValue").textContent = state.codexRuntime?.effort || state.config.effort || "Codex 默认";
@@ -691,23 +695,79 @@ function renderChatPanel() {
     return;
   }
   const renderKey = `messages:${sessionKey(session)}:${responding}:${JSON.stringify(state.sessionMessages)}`;
-  const html = state.sessionMessages.map((message) => `<article class="chat-message is-${escapeAttr(message.role)}${message.attachments?.length ? " has-attachments" : ""}">
+  const html = renderConversationMessages(state.sessionMessages, responding) + (responding ? renderTypingIndicator() : "");
+  setChatMessagesHtml(html, renderKey);
+}
+
+function renderConversationMessages(messages, responding) {
+  const html = [];
+  let lastUserCreatedAt;
+  let index = 0;
+  while (index < messages.length) {
+    const message = messages[index];
+    if (message.kind === "progress") {
+      const progress = [];
+      while (index < messages.length && messages[index].kind === "progress") {
+        progress.push(messages[index]);
+        index += 1;
+      }
+      const nextMessage = messages[index];
+      const active = responding && !nextMessage;
+      const completedAt = nextMessage?.role === "assistant"
+        ? nextMessage.createdAt
+        : progress.at(-1)?.createdAt;
+      html.push(renderProgressGroup(progress, lastUserCreatedAt, completedAt, active));
+      continue;
+    }
+    if (message.role === "user") lastUserCreatedAt = message.createdAt;
+    html.push(renderChatMessage(message));
+    index += 1;
+  }
+  return html.join("");
+}
+
+function renderChatMessage(message) {
+  return `<article class="chat-message is-${escapeAttr(message.role)}${message.attachments?.length ? " has-attachments" : ""}">
     <div class="message-meta"><span>${message.role === "user" ? "你" : "Codex"}</span>${message.createdAt ? `<time datetime="${escapeAttr(message.createdAt)}">${escapeHtml(messageTime(message.createdAt))}</time>` : ""}</div>
     <div class="message-bubble">${message.text ? renderMarkdown(message.text) : ""}${renderMessageAttachments(message.attachments)}</div>
-  </article>`).join("") + (responding ? renderTypingIndicator() : "");
-  setChatMessagesHtml(html, renderKey);
+  </article>`;
+}
+
+function renderProgressGroup(messages, startedAt, completedAt, active) {
+  const duration = formatProcessingDuration(startedAt, active ? new Date().toISOString() : completedAt);
+  return `<details class="chat-progress-group"${active ? " open" : ""}>
+    <summary>
+      <span class="progress-summary-title"><i data-lucide="chevron-right"></i>处理过程</span>
+      <span>${active ? "已处理" : "处理用时"} ${escapeHtml(duration)}</span>
+    </summary>
+    <ol class="progress-list">${messages.map((message) => `<li>${renderMarkdown(message.text)}</li>`).join("")}</ol>
+  </details>`;
+}
+
+function formatProcessingDuration(startValue, endValue) {
+  const start = new Date(startValue || "").getTime();
+  const end = new Date(endValue || "").getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "--";
+  const seconds = Math.max(0, Math.round((end - start) / 1000));
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return remaining ? `${minutes} 分 ${remaining} 秒` : `${minutes} 分钟`;
 }
 
 function renderSessionRuntimeControls(session) {
   const disabled = !session || state.sendingMessage || state.savingSessionRuntime;
   els.sessionModelInput.disabled = disabled;
   els.sessionEffortInput.disabled = disabled;
+  els.sessionStreamInput.disabled = disabled;
   const renderKey = session ? [
     sessionKey(session),
     session.model || "",
     session.effort || "",
+    typeof session.streamReplies === "boolean" ? String(session.streamReplies) : "inherit",
     state.config?.model || "",
     state.config?.effort || "",
+    String(Boolean(state.config?.streamReplies)),
     state.codexRuntime?.model || "",
     state.codexRuntime?.effort || "",
     state.codexModels.length
@@ -718,6 +778,7 @@ function renderSessionRuntimeControls(session) {
   if (!session) {
     els.sessionModelInput.innerHTML = '<option value="">选择会话后设置</option>';
     els.sessionEffortInput.innerHTML = '<option value="">选择会话后设置</option>';
+    els.sessionStreamInput.innerHTML = '<option value="">选择会话后设置</option>';
     return;
   }
 
@@ -739,6 +800,14 @@ function renderSessionRuntimeControls(session) {
   els.sessionModelInput.innerHTML = options.map((option) => `<option value="${escapeAttr(option.value)}"${option.title ? ` title="${escapeAttr(option.title)}"` : ""}>${escapeHtml(option.label)}</option>`).join("");
   els.sessionModelInput.value = session.model || "";
   setSessionEffortOptions(session.model || "", session.effort || "");
+  els.sessionStreamInput.innerHTML = [
+    `<option value="">继承全局（${state.config?.streamReplies ? "开启" : "关闭"}）</option>`,
+    '<option value="on">开启</option>',
+    '<option value="off">关闭</option>'
+  ].join("");
+  els.sessionStreamInput.value = typeof session.streamReplies === "boolean"
+    ? session.streamReplies ? "on" : "off"
+    : "";
 }
 
 function setSessionEffortOptions(modelOverride, preferredEffort) {
@@ -783,18 +852,23 @@ async function saveSessionRuntimeSettings() {
   const key = sessionKey(session);
   const model = els.sessionModelInput.value;
   const effort = els.sessionEffortInput.value;
+  const stream = els.sessionStreamInput.value;
   state.savingSessionRuntime = true;
   renderChatPanel();
   try {
     const result = await api(`/api/sessions/${encodeURIComponent(session.accountId)}/${encodeURIComponent(session.id)}`, {
       method: "PATCH",
-      body: { model: model || null, effort: effort || null }
+      body: {
+        model: model || null,
+        effort: effort || null,
+        streamReplies: stream ? stream === "on" : null
+      }
     });
     const index = state.sessions.findIndex((candidate) => sessionKey(candidate) === key);
     if (index >= 0) state.sessions[index] = result.session;
     els.sessionRuntimeToolbar.dataset.renderKey = "";
     renderSessions();
-    toast("会话模型设置已更新");
+    toast("会话设置已更新");
   } catch (error) {
     toast(error.message, true);
     await refreshData(false);
@@ -859,6 +933,8 @@ async function sendSessionMessage(event) {
   const files = [...state.chatFiles];
   if (!session || (!text && !files.length) || state.sendingMessage) return;
   const key = sessionKey(session);
+  const streaming = session.streamReplies ?? Boolean(state.config?.streamReplies);
+  let progressSequence = 0;
   state.sendingMessage = true;
   state.sessionMessages.push({
     id: `pending-${Date.now()}`,
@@ -881,10 +957,29 @@ async function sendSessionMessage(event) {
     const body = new FormData();
     body.append("text", text);
     files.forEach((file) => body.append("files", file, file.name));
-    await api(`/api/sessions/${encodeURIComponent(session.accountId)}/${encodeURIComponent(session.id)}/messages`, {
-      method: "POST",
-      body
-    });
+    const url = `/api/sessions/${encodeURIComponent(session.accountId)}/${encodeURIComponent(session.id)}/messages`;
+    if (streaming) {
+      await streamApi(`${url}?stream=1`, { method: "POST", body }, (streamEvent) => {
+        if (state.selectedSessionKey !== key) return;
+        if (streamEvent.type === "progress" && streamEvent.message?.trim()) {
+          state.sessionMessages.push({
+            id: `progress-${Date.now()}-${progressSequence++}`,
+            role: "assistant",
+            text: streamEvent.message.trim(),
+            kind: "progress",
+            createdAt: new Date().toISOString(),
+            attachments: []
+          });
+          scheduleStreamingRender();
+        }
+        if (streamEvent.type === "done" && streamEvent.result?.message) {
+          state.sessionMessages.push(streamEvent.result.message);
+          scheduleStreamingRender();
+        }
+      });
+    } else {
+      await api(url, { method: "POST", body });
+    }
     await refreshData(false);
     if (state.selectedSessionKey === key) {
       await loadSelectedSessionMessages();
@@ -901,6 +996,15 @@ async function sendSessionMessage(event) {
     renderChatPanel();
     els.chatInput.focus();
   }
+}
+
+function scheduleStreamingRender() {
+  if (streamingRenderFrame) return;
+  streamingRenderFrame = requestAnimationFrame(() => {
+    streamingRenderFrame = 0;
+    renderChatPanel();
+    scrollChatToEnd();
+  });
 }
 
 function handleChatFileSelection(event) {
@@ -1115,7 +1219,8 @@ async function saveSettings(event) {
         codexBackend: document.querySelector("#backendInput").value,
         codexExecSandbox: document.querySelector("#sandboxInput").value || null,
         model: document.querySelector("#modelInput").value.trim(),
-        effort: document.querySelector("#effortInput").value.trim()
+        effort: document.querySelector("#effortInput").value.trim(),
+        streamReplies: document.querySelector("#streamRepliesInput").checked
       }
     });
     state.config = result.config;
@@ -1157,6 +1262,46 @@ async function api(url, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `请求失败 (${response.status})`);
   return data;
+}
+
+async function streamApi(url, options, onEvent) {
+  const headers = {};
+  if (state.requestToken) headers["X-Codex-Weixin-Token"] = state.requestToken;
+  const response = await fetch(url, {
+    method: options.method || "POST",
+    headers,
+    body: options.body
+  });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.startsWith("application/x-ndjson")) {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `请求失败 (${response.status})`);
+    return data.result;
+  }
+  if (!response.ok || !response.body) {
+    throw new Error(`请求失败 (${response.status})`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result;
+  const consumeLine = (line) => {
+    if (!line.trim()) return;
+    const streamEvent = JSON.parse(line);
+    if (streamEvent.type === "error") throw new Error(streamEvent.error || "过程进度失败");
+    onEvent(streamEvent);
+    if (streamEvent.type === "done") result = streamEvent.result;
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || "";
+    for (const line of lines) consumeLine(line);
+    if (done) break;
+  }
+  if (buffer) consumeLine(buffer);
+  return result;
 }
 
 function emptyState(icon, title, description = "", action = "") {

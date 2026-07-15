@@ -2,6 +2,23 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.7] - 2026-07-15
+
+### Added
+
+- Added process-progress delivery from Codex app-server to WeChat and the Web session page, with global and per-session controls plus the `/stream` WeChat command.
+- Added collapsible Web progress timelines that stay open while processing, collapse after completion, and display the total processing time.
+
+### Changed
+
+- Enabled process progress by default for new installations and configurations that have not explicitly chosen a value.
+- Kept final answers out of token-level streaming so Web and WeChat render one stable answer, splitting WeChat messages only when the platform length limit requires it.
+
+### Fixed
+
+- Preserved complete long answers in bounded WeChat chunks instead of losing the tail after many paragraph-level sends.
+- Kept Web and WeChat final-answer content aligned while separating public progress commentary from the authoritative final response.
+
 ## [0.2.6] - 2026-07-15
 
 ### Added
@@ -83,6 +100,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.7]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.7
 [0.2.6]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.6
 [0.2.5]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.5
 [0.2.4]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.4

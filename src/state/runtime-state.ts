@@ -12,6 +12,7 @@ export type ManagedSession = {
   threadId?: string;
   model?: string;
   effort?: string;
+  streamReplies?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -19,6 +20,7 @@ export type ManagedSession = {
 export type SessionRuntimeOverrides = {
   model?: string | null;
   effort?: string | null;
+  streamReplies?: boolean | null;
 };
 
 export type RuntimeState = {
@@ -168,6 +170,20 @@ export class RuntimeStateStore {
     this.save();
   }
 
+  setStreamRepliesOverride(senderId: string, streamReplies?: boolean): void {
+    const session = this.mutableActiveSession(senderId);
+    if (!session) {
+      throw new Error(`No active session for sender: ${senderId}`);
+    }
+    if (typeof streamReplies === "boolean") {
+      session.streamReplies = streamReplies;
+    } else {
+      delete session.streamReplies;
+    }
+    session.updatedAt = new Date().toISOString();
+    this.save();
+  }
+
   listSessions(): ManagedSession[] {
     return structuredClone(this.state.sessions)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -260,6 +276,10 @@ export class RuntimeStateStore {
       const effort = overrides.effort?.trim();
       if (effort) session.effort = effort;
       else delete session.effort;
+    }
+    if (Object.hasOwn(overrides, "streamReplies")) {
+      if (typeof overrides.streamReplies === "boolean") session.streamReplies = overrides.streamReplies;
+      else delete session.streamReplies;
     }
     session.updatedAt = new Date().toISOString();
     this.save();

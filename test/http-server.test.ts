@@ -165,7 +165,7 @@ test("local API redacts credentials and protects mutations", async (t) => {
   assert.equal(authorized.status, 201);
 
   const sessionsResponse = await fetch(`${server.url}/api/sessions`);
-  let sessions = await sessionsResponse.json() as { sessions: Array<{ id: string; title: string; active: boolean; model?: string; effort?: string }> };
+  let sessions = await sessionsResponse.json() as { sessions: Array<{ id: string; title: string; active: boolean; model?: string; effort?: string; streamReplies?: boolean }> };
   assert.deepEqual(sessions.sessions.map((session) => [session.title, session.active]), [["Web session", true]]);
 
   const session = sessions.sessions[0];
@@ -176,17 +176,18 @@ test("local API redacts credentials and protects mutations", async (t) => {
       "X-Codex-Weixin-Token": bootstrap.requestToken,
       Origin: server.url
     },
-    body: JSON.stringify({ model: "gpt-session", effort: "high" })
+    body: JSON.stringify({ model: "gpt-session", effort: "high", streamReplies: true })
   });
   assert.equal(runtimeUpdate.status, 200);
   assert.deepEqual(
-    await runtimeUpdate.json() as { session: { model: string; effort: string } },
-    { session: { ...(manager.listSessions()[0]), model: "gpt-session", effort: "high" } }
+    await runtimeUpdate.json() as { session: { model: string; effort: string; streamReplies: boolean } },
+    { session: { ...(manager.listSessions()[0]), model: "gpt-session", effort: "high", streamReplies: true } }
   );
 
   sessions = await (await fetch(`${server.url}/api/sessions`)).json() as typeof sessions;
   assert.equal(sessions.sessions[0].model, "gpt-session");
   assert.equal(sessions.sessions[0].effort, "high");
+  assert.equal(sessions.sessions[0].streamReplies, true);
 });
 
 test("session message API reads history and continues chat with mutation protection", async (t) => {
@@ -302,6 +303,55 @@ test("session message API accepts text and file uploads together", async (t) => 
   assert.equal(oversizedResponse.status, 400);
   assert.match((await oversizedResponse.json() as { error: string }).error, /exceed/i);
   assert.equal(calls.length, 1);
+});
+
+test("session message API streams progress followed by one final completion", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-stream-api-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const paths = resolveStatePaths(root);
+  const manager = {
+    isSessionStreamEnabled() {
+      return true;
+    },
+    async continueSession(
+      _accountId: string,
+      _sessionId: string,
+      _text: string,
+      _uploads: unknown[],
+      onProgress?: (message: string) => Promise<void>
+    ) {
+      await onProgress?.("正在查询资料。");
+      return {
+        threadId: "thread-stream",
+        message: { id: "message-stream", role: "assistant", text: "第一段。\n\n第二段。" }
+      };
+    }
+  } as never;
+  const server = await startLocalHttpServer({ paths, accountManager: manager, port: 0 });
+  t.after(() => server.close());
+  const response = await fetch(`${server.url}/api/sessions/account-one/session-one/messages?stream=1`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Codex-Weixin-Token": server.requestToken,
+      Origin: server.url
+    },
+    body: JSON.stringify({ text: "开始" })
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/x-ndjson/);
+  const events = (await response.text()).trim().split("\n").map((line) => JSON.parse(line));
+  assert.deepEqual(events, [
+    { type: "progress", message: "正在查询资料。" },
+    {
+      type: "done",
+      result: {
+        threadId: "thread-stream",
+        message: { id: "message-stream", role: "assistant", text: "第一段。\n\n第二段。" }
+      }
+    }
+  ]);
 });
 
 test("session attachments use scoped URLs and support video byte ranges", async (t) => {

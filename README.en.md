@@ -35,6 +35,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | ✅ | WeChat media input | Accepts transcribed voice, images, audio, video, and files as local Codex attachments. | Pending: `docs/images/screenshots/wechat-media-input.png` |
 | ✅ | File delivery to WeChat | Codex can return local images, videos, and files as native WeChat messages. | Pending: `docs/images/screenshots/wechat-media-output.png` |
 | ✅ | Models and reasoning effort | Model-aware dropdowns loaded from app-server, including GPT-5.6 Sol, Terra, and Luna for IkunCoding. | Pending: `docs/images/screenshots/web-model-settings.png` |
+| ✅ | Process progress | Enabled by default; Codex progress reaches WeChat immediately and appears in a collapsible Web timeline with elapsed time, while final answers stay intact. | Pending: `docs/images/screenshots/web-process-progress.png` |
 | ✅ | Typing state and deduplication | Web typing state plus persistent sync cursors and message IDs prevent duplicate replies. | Pending: `docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server first | New and resumed sessions prefer Codex app-server V2 and fall back to `codex exec` when unavailable. | Pending: `docs/images/screenshots/wechat-status.png` |
 | ✅ | Web auto-update | Automatically selects npm or npmmirror, then installs, restarts, and reconnects from the Web prompt. | Pending: `docs/images/screenshots/web-auto-update.png` |
@@ -97,7 +98,7 @@ Repeat the QR flow to add more accounts. Every account has its own monitor, send
 
 The Sessions page manages conversations created and used by this server. It does not scan or take ownership of every Codex conversation created in other terminals.
 
-Selecting a session reads its user messages and final replies from Codex's own persisted thread. The controls below the chat title select a model and reasoning effort for the current session or keep inheriting global settings; they share the same session configuration used by the WeChat `/model` and `/effort` commands. The Web composer can submit text and multiple files as one turn and continues that same thread, so context remains shared with later WeChat messages. Uploads are isolated by account and session under `~/.codex-weixin/inbound/`, with at most 10 files and 50 MB total per turn.
+Selecting a session reads its user messages and final replies from Codex's own persisted thread. The controls below the chat title select a model, reasoning effort, and process-progress behavior for the current session or keep inheriting global settings; they share the same session configuration used by the WeChat `/model`, `/effort`, and `/stream` commands. Process progress is enabled by default, appears in a collapsible Web timeline with elapsed time, and leaves the final answer as one stable response. The Web composer can submit text and multiple files as one turn and continues that same thread, so context remains shared with later WeChat messages. Uploads are isolated by account and session under `~/.codex-weixin/inbound/`, with at most 10 files and 50 MB total per turn.
 
 The UI uses local remarks instead of treating internal IDs as account names. Expand “Account IDs” on an account card to inspect its iLink Bot ID and User ID; Codex thread IDs remain hidden from the regular UI. Each account can have a local remark edited from the WeChat Accounts page; the remark is reused by session tabs, with `WeChat Account 1` used only as a fallback. The current QR and messaging APIs do not expose WeChat nicknames, avatars, or a profile lookup endpoint, so the page uses a default icon.
 
@@ -118,6 +119,8 @@ The UI uses local remarks instead of treating internal IDs as account names. Exp
 /model <number|model|default>  Switch this session's model or restore inheritance
 /effort                       Show reasoning efforts supported by the current model
 /effort <number|level|default> Switch this session's effort or restore inheritance
+/stream                       Show this session's process-progress setting
+/stream <on|off|default>       Enable, disable, or restore global process progress
 /prompt start                 Buffer multiple WeChat messages
 /prompt done                  Submit the buffer as one Codex turn
 /stop                         Interrupt the current Codex task

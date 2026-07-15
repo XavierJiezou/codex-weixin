@@ -14,6 +14,7 @@ export type CodexWeixinConfig = {
   codexExecSandbox?: CodexExecSandbox;
   model?: string;
   effort?: string;
+  streamReplies: boolean;
   maxBufferItems: number;
   promptBufferTtlMs: number;
   maxInboundBytes: number;
@@ -26,6 +27,7 @@ export function defaultConfig(cwd = path.join(os.homedir(), ".codex-weixin")): C
     allowedWorkspaces: [path.resolve(cwd)],
     codexBin: "codex",
     codexBackend: "auto",
+    streamReplies: true,
     maxBufferItems: 50,
     promptBufferTtlMs: 10 * 60_000,
     maxInboundBytes: 50 * 1024 * 1024
@@ -40,6 +42,7 @@ export function loadConfig(paths: StatePaths, cwd?: string): CodexWeixinConfig {
     ...base,
     ...loaded,
     codexExecSandbox,
+    streamReplies: typeof loaded.streamReplies === "boolean" ? loaded.streamReplies : base.streamReplies,
     allowedSenderIds: loaded.allowedSenderIds ?? base.allowedSenderIds,
     allowedWorkspaces: (loaded.allowedWorkspaces?.length ? loaded.allowedWorkspaces : base.allowedWorkspaces)
       .map((workspace) => path.resolve(workspace))

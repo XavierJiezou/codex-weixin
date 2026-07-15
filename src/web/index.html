@@ -109,6 +109,14 @@
               <span>推理强度</span>
               <select id="sessionEffortInput" disabled><option value="">继承全局设置</option></select>
             </label>
+            <label>
+              <span>过程进度</span>
+              <select id="sessionStreamInput" disabled>
+                <option value="">继承全局设置</option>
+                <option value="on">开启</option>
+                <option value="off">关闭</option>
+              </select>
+            </label>
           </div>
           <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
           <form class="chat-composer" id="chatComposer">
@@ -183,6 +191,13 @@
                 <option value="">沿用模型默认</option>
               </select>
               <small class="field-hint effective-setting"><span>当前生效</span><strong id="effectiveEffortValue">正在读取</strong></small>
+            </label>
+            <label class="toggle-field" for="streamRepliesInput">
+              <span>过程进度</span>
+              <span class="toggle-control">
+                <input id="streamRepliesInput" name="streamReplies" type="checkbox">
+                <span aria-hidden="true"></span>
+              </span>
             </label>
           </div>
         </div>

@@ -99,6 +99,9 @@ export class BridgeService {
       case "effort":
         await this.handleEffortCommand(message.senderId, command.arg);
         return;
+      case "stream":
+        await this.handleStreamCommand(message.senderId, command.arg);
+        return;
       case "prompt":
         await this.handlePromptCommand(message.senderId, command.arg);
         return;
@@ -225,6 +228,30 @@ export class BridgeService {
     await this.reply(senderId, `本会话推理强度已切换为：${formatEffort(effort)}\n下一条消息开始生效。`);
   }
 
+  private async handleStreamCommand(senderId: string, arg: string): Promise<void> {
+    const input = arg.trim().toLowerCase();
+    const session = this.options.stateStore.getActiveSession(senderId);
+    const inherited = this.options.config.streamReplies;
+    if (!input) {
+      const effective = session?.streamReplies ?? inherited;
+      const source = typeof session?.streamReplies === "boolean" ? "本会话设置" : "继承全局";
+      await this.reply(senderId, `当前过程进度：${effective ? "开启" : "关闭"}（${source}）\n发送 /stream on、/stream off 或 /stream default 切换。`);
+      return;
+    }
+    if (input === "default") {
+      this.options.stateStore.setStreamRepliesOverride(senderId);
+      await this.reply(senderId, `已恢复继承全局设置。当前过程进度：${inherited ? "开启" : "关闭"}。`);
+      return;
+    }
+    if (input !== "on" && input !== "off") {
+      await this.reply(senderId, "用法：/stream on、/stream off 或 /stream default");
+      return;
+    }
+    const enabled = input === "on";
+    this.options.stateStore.setStreamRepliesOverride(senderId, enabled);
+    await this.reply(senderId, `本会话过程进度已${enabled ? "开启" : "关闭"}。`);
+  }
+
   private async promptItemsFromMessage(message: NormalizedWeixinMessage): Promise<PromptBufferItem[]> {
     const items: PromptBufferItem[] = [];
     if (message.text.trim()) {
@@ -263,6 +290,8 @@ export class BridgeService {
     const session = this.options.stateStore.ensureActiveSession(message.senderId, this.options.config.defaultCwd);
     const workspace = this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd;
     const threadId = this.options.stateStore.getThread(message.senderId) || undefined;
+    const progressEnabled = session.streamReplies ?? this.options.config.streamReplies;
+    const sentProgress = new Set<string>();
     this.options.onTurnStatus?.({ senderId: message.senderId, sessionId: session.id, active: true });
     try {
       await this.withTyping(message.senderId, async () => {
@@ -272,15 +301,24 @@ export class BridgeService {
           cwd: workspace,
           threadId,
           model: session.model ?? this.options.config.model,
-          effort: session.effort ?? this.options.config.effort
+          effort: session.effort ?? this.options.config.effort,
+          ...(progressEnabled ? {
+            onProgress: async (progress: string) => {
+              const progressText = progress.trim();
+              if (!progressText || sentProgress.has(progressText)) return;
+              sentProgress.add(progressText);
+              await this.reply(message.senderId, `【进度】${progressText}`);
+            }
+          } : {})
         });
         console.log(`[codex-weixin] Codex turn completed for ${message.senderId}; text=${result.text.length} chars`);
         if (result.threadId) {
           this.options.stateStore.setThread(message.senderId, result.threadId);
         }
         const parsed = parseActionBlocks(result.text);
-        if (parsed.visibleText.trim()) {
-          for (const chunk of chunkText(parsed.visibleText)) {
+        const remaining = chunkText(parsed.visibleText);
+        if (remaining.length) {
+          for (const chunk of remaining) {
             await this.reply(message.senderId, chunk);
           }
         }
@@ -345,7 +383,8 @@ export class BridgeService {
       `backend: ${this.options.config.codexBackend}`,
       `exec sandbox: ${this.options.config.codexExecSandbox ?? "(Codex default)"}`,
       `model: ${runtime.model ?? "(Codex default)"}`,
-      `effort: ${runtime.effort ?? "(Codex default)"}`
+      `effort: ${runtime.effort ?? "(Codex default)"}`,
+      `stream replies: ${(session?.streamReplies ?? this.options.config.streamReplies) ? "on" : "off"}${typeof session?.streamReplies === "boolean" ? " (session)" : " (global)"}`
     ].join("\n");
   }
 
@@ -422,6 +461,7 @@ function helpText(): string {
     "/new - create a new managed Codex session",
     "/model [number|model-id|default] - view or switch this session's model",
     "/effort [number|level|default] - view or switch reasoning effort",
+    "/stream [on|off|default] - view or switch streaming replies",
     "/prompt start - buffer multiple WeChat messages",
     "/prompt done - submit buffered prompt",
     "/stop - interrupt the current Codex task"

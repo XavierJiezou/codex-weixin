@@ -175,13 +175,50 @@ rl.on("line", (line) => {
       return;
     }
     setTimeout(() => {
+      const progressItemId = `progress-${turnId}`;
+      send({
+        method: "item/started",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          item: { type: "agentMessage", id: progressItemId, text: "", phase: "commentary", memoryCitation: null }
+        }
+      });
+      send({
+        method: "item/agentMessage/delta",
+        params: { threadId: message.params.threadId, turnId, itemId: progressItemId, delta: `working:${prompt}` }
+      });
       send({
         method: "item/completed",
         params: {
           threadId: message.params.threadId,
           turnId,
           completedAtMs: Date.now(),
-          item: { type: "agentMessage", id: `item-${turnId}`, text: `reply:${prompt}`, phase: null, memoryCitation: null }
+          item: { type: "agentMessage", id: progressItemId, text: `working:${prompt}`, phase: "commentary", memoryCitation: null }
+        }
+      });
+      const itemId = `item-${turnId}`;
+      send({
+        method: "item/started",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          item: { type: "agentMessage", id: itemId, text: "", phase: "final_answer", memoryCitation: null }
+        }
+      });
+      for (const delta of ["reply:", prompt]) {
+        send({
+          method: "item/agentMessage/delta",
+          params: { threadId: message.params.threadId, turnId, itemId, delta }
+        });
+      }
+      send({
+        method: "item/completed",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          completedAtMs: Date.now(),
+          item: { type: "agentMessage", id: itemId, text: `reply:${prompt}`, phase: "final_answer", memoryCitation: null }
         }
       });
       send({

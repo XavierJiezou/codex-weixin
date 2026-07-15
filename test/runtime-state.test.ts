@@ -83,19 +83,21 @@ test("persists model and reasoning effort overrides per managed session", (t) =>
   assert.equal(reloaded.getActiveSession("alice@im.wechat")?.effort, undefined);
 });
 
-test("updates model and effort by managed session id for Web controls", (t) => {
+test("updates model, effort, and streaming by managed session id for Web controls", (t) => {
   const store = createStore(t);
   const first = store.createSession("alice@im.wechat", "/work/one", "First");
   const second = store.createSession("alice@im.wechat", "/work/two", "Second");
 
-  store.updateSessionRuntime(first.id, { model: "gpt-session", effort: "high" });
+  store.updateSessionRuntime(first.id, { model: "gpt-session", effort: "high", streamReplies: true });
   assert.equal(store.getSession(first.id)?.model, "gpt-session");
   assert.equal(store.getSession(first.id)?.effort, "high");
+  assert.equal(store.getSession(first.id)?.streamReplies, true);
   assert.equal(store.getSession(second.id)?.model, undefined);
 
-  store.updateSessionRuntime(first.id, { model: null, effort: null });
+  store.updateSessionRuntime(first.id, { model: null, effort: null, streamReplies: null });
   assert.equal(store.getSession(first.id)?.model, undefined);
   assert.equal(store.getSession(first.id)?.effort, undefined);
+  assert.equal(store.getSession(first.id)?.streamReplies, undefined);
 });
 
 test("persistently claims inbound message ids once and bounds the history", (t) => {

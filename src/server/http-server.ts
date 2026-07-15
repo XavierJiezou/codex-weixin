@@ -23,7 +23,8 @@ const accountDisplayNameSchema = z.object({
 const sessionPatchSchema = z.object({
   title: z.string().max(80).optional(),
   model: z.string().max(200).nullable().optional(),
-  effort: z.string().max(40).nullable().optional()
+  effort: z.string().max(40).nullable().optional(),
+  streamReplies: z.boolean().nullable().optional()
 }).refine((value) => Object.keys(value).length > 0, "Session update is empty");
 const configSchema = z.object({
   defaultCwd: z.string().min(1),
@@ -31,7 +32,8 @@ const configSchema = z.object({
   codexBackend: z.enum(["auto", "app-server", "exec"]),
   codexExecSandbox: z.enum(["read-only", "workspace-write", "danger-full-access"]).nullable().optional(),
   model: z.string().optional(),
-  effort: z.string().optional()
+  effort: z.string().optional(),
+  streamReplies: z.boolean().optional()
 });
 const MAX_WEB_UPLOAD_FILES = 10;
 const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
@@ -261,6 +263,29 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
   }
   if (method === "POST" && sessionAction?.action === "messages") {
     const body = await readSessionMessageBody(request, loadConfig(context.paths).maxInboundBytes);
+    const stream = url.searchParams.get("stream") === "1"
+      && context.accountManager.isSessionStreamEnabled(sessionAction.accountId, sessionAction.sessionId);
+    if (stream) {
+      startNdjson(response);
+      try {
+        const result = await context.accountManager.continueSession(
+          sessionAction.accountId,
+          sessionAction.sessionId,
+          body.text,
+          body.uploads,
+          async (message) => writeNdjson(response, { type: "progress", message })
+        );
+        await writeNdjson(response, { type: "done", result });
+      } catch (error) {
+        await writeNdjson(response, {
+          type: "error",
+          error: error instanceof Error ? error.message : String(error)
+        });
+      } finally {
+        if (!response.writableEnded) response.end();
+      }
+      return;
+    }
     sendJson(response, 200, {
       result: await context.accountManager.continueSession(
         sessionAction.accountId,
@@ -290,13 +315,14 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
         body.title
       );
     }
-    if (body.model !== undefined || body.effort !== undefined) {
+    if (body.model !== undefined || body.effort !== undefined || body.streamReplies !== undefined) {
       session = context.accountManager.updateSessionRuntime(
         sessionMatch.accountId,
         sessionMatch.sessionId,
         {
           ...(body.model !== undefined ? { model: body.model } : {}),
-          ...(body.effort !== undefined ? { effort: body.effort } : {})
+          ...(body.effort !== undefined ? { effort: body.effort } : {}),
+          ...(body.streamReplies !== undefined ? { streamReplies: body.streamReplies } : {})
         }
       );
     }
@@ -509,6 +535,27 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
   response.statusCode = status;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.end(`${JSON.stringify(value)}\n`);
+}
+
+function startNdjson(response: ServerResponse): void {
+  response.statusCode = 200;
+  response.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("X-Accel-Buffering", "no");
+}
+
+async function writeNdjson(response: ServerResponse, value: unknown): Promise<void> {
+  if (response.destroyed || response.writableEnded) return;
+  if (response.write(`${JSON.stringify(value)}\n`)) return;
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      response.off("drain", finish);
+      response.off("close", finish);
+      resolve();
+    };
+    response.once("drain", finish);
+    response.once("close", finish);
+  });
 }
 
 function withAttachmentUrls(
