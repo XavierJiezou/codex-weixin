@@ -112,6 +112,39 @@ test("resolves a Windows npm codex.cmd shim to the real Node entry point", () =>
   });
 });
 
+test("finds the Codex CLI bundled with the macOS desktop app outside PATH", () => {
+  const bundledCli = "/Applications/ChatGPT.app/Contents/Resources/codex";
+
+  assert.deepEqual(resolveCodexCommand("codex", {
+    platform: "darwin",
+    env: {
+      HOME: "/Users/tester",
+      PATH: "/usr/bin:/bin"
+    },
+    existsSync: (candidate) => candidate === bundledCli
+  }), {
+    command: bundledCli,
+    argsPrefix: []
+  });
+});
+
+test("prefers a Codex CLI already available on the macOS PATH", () => {
+  const pathCli = "/opt/homebrew/bin/codex";
+  const bundledCli = "/Applications/ChatGPT.app/Contents/Resources/codex";
+
+  assert.deepEqual(resolveCodexCommand("codex", {
+    platform: "darwin",
+    env: {
+      HOME: "/Users/tester",
+      PATH: "/opt/homebrew/bin:/usr/bin:/bin"
+    },
+    existsSync: (candidate) => candidate === pathCli || candidate === bundledCli
+  }), {
+    command: "codex",
+    argsPrefix: []
+  });
+});
+
 test("extracts nested agent_message text and thread id from codex json output", () => {
   const raw = [
     JSON.stringify({ type: "thread.started", thread_id: "019f2ac8-4d54-7970-9490-f6675d60286a" }),

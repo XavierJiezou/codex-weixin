@@ -2,6 +2,13 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.1] - 2026-07-16
+
+### Fixed
+
+- Fixed macOS background restarts reporting that Codex CLI was missing when Codex was provided only by the ChatGPT or Codex desktop app bundle outside the service `PATH`.
+- Reused desktop CLI discovery for the Web status probe, app-server, and `codex exec` while continuing to prefer an existing CLI available on `PATH`.
+
 ## [0.3.0] - 2026-07-16
 
 ### Fixed
@@ -135,6 +142,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.1
 [0.3.0]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.0
 [0.2.9]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.9
 [0.2.8]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.8
