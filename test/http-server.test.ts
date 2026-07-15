@@ -72,7 +72,12 @@ test("local API redacts credentials and protects mutations", async (t) => {
   assert.equal(JSON.stringify(bootstrap).includes("must-never-reach-browser"), false);
 
   const pageResponse = await fetch(server.url);
-  assert.match(await pageResponse.text(), /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+  const pageHtml = await pageResponse.text();
+  assert.match(pageHtml, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+  assert.match(
+    pageHtml,
+    /href="https:\/\/github\.com\/XavierJiezou\/codex-weixin" target="_blank" rel="noopener noreferrer"/
+  );
   const faviconResponse = await fetch(`${server.url}/favicon.svg`);
   assert.equal(faviconResponse.status, 200);
   assert.match(faviconResponse.headers.get("content-type") ?? "", /^image\/svg\+xml/);

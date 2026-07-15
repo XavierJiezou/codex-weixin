@@ -44,7 +44,8 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .tab { min-width: 82px; height: 30px; border: 0; border-radius: 4px; color: var(--ink-soft); background: transparent; font-size: 13px; font-weight: 650; }
 .tab:hover { color: var(--ink); }
 .tab.is-active { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgb(20 27 25 / 12%); }
-.header-action { justify-self: end; }
+.header-actions { justify-self: end; display: flex; align-items: center; gap: 8px; }
+.github-link { color: var(--ink); text-decoration: none; }
 
 .button { min-height: 38px; padding: 0 14px; border: 1px solid transparent; border-radius: var(--radius); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }
 .button svg { width: 17px; height: 17px; }
