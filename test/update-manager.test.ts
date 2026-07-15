@@ -8,6 +8,7 @@ import {
   normalizeProcessExitCode,
   releaseRuntimeDirectoryLock,
   resolveNpmInstallPrefix,
+  resolveNpmInstallTarget,
   UpdateManager
 } from "../src/server/update-manager.js";
 
@@ -143,31 +144,44 @@ test("installs only the server-verified latest version and rejects concurrent up
 
 test("builds fixed cross-platform npm install commands", () => {
   assert.deepEqual(buildNpmInstallCommand("1.2.4", "npmmirror", {
-    installPrefix: "/opt/homebrew/lib",
+    installPrefix: "/opt/homebrew",
+    global: true,
     platform: "darwin",
     env: {},
     nodePath: "/node"
   }), {
     command: "npm",
-    args: ["install", "--prefix", "/opt/homebrew/lib", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmmirror.com", "--no-audit", "--no-fund"]
+    args: ["install", "--global", "--prefix", "/opt/homebrew", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmmirror.com", "--no-audit", "--no-fund"]
+  });
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
+    installPrefix: "/Users/tester/codex-weixin-runtime",
+    global: false,
+    platform: "darwin",
+    env: {},
+    nodePath: "/node"
+  }), {
+    command: "npm",
+    args: ["install", "--prefix", "/Users/tester/codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
   });
   assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
     installPrefix: "C:\\Users\\THU\\codex-weixin-runtime",
+    global: true,
     platform: "win32",
     env: { ComSpec: "C:\\Windows\\cmd.exe" },
     nodePath: "C:\\node.exe"
   }), {
     command: "C:\\Windows\\cmd.exe",
-    args: ["/d", "/s", "/c", "npm", "install", "--prefix", "C:\\Users\\THU\\codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+    args: ["/d", "/s", "/c", "npm", "install", "--global", "--prefix", "C:\\Users\\THU\\codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
   });
   assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
     installPrefix: "C:\\Users\\THU\\codex-weixin-runtime",
+    global: true,
     platform: "win32",
     env: { npm_execpath: "C:\\npm\\npm-cli.js" },
     nodePath: "C:\\node.exe"
   }), {
     command: "C:\\node.exe",
-    args: ["C:\\npm\\npm-cli.js", "install", "--prefix", "C:\\Users\\THU\\codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+    args: ["C:\\npm\\npm-cli.js", "install", "--global", "--prefix", "C:\\Users\\THU\\codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
   });
   assert.throws(
     () => buildNpmInstallCommand("latest", "official", { installPrefix: "/runtime" }),
@@ -183,16 +197,41 @@ test("builds fixed cross-platform npm install commands", () => {
   );
 });
 
-test("resolves the npm prefix that owns the active package on macOS and Windows", () => {
+test("resolves global and isolated npm install targets on macOS and Windows", () => {
+  assert.deepEqual(
+    resolveNpmInstallTarget("/opt/homebrew/lib/node_modules/codex-weixin", "darwin"),
+    {
+      installPrefix: "/opt/homebrew",
+      packageRoot: "/opt/homebrew/lib/node_modules/codex-weixin",
+      global: true
+    }
+  );
+  assert.deepEqual(
+    resolveNpmInstallTarget("/Users/tester/codex-weixin-runtime/node_modules/codex-weixin", "darwin"),
+    {
+      installPrefix: "/Users/tester/codex-weixin-runtime",
+      packageRoot: "/Users/tester/codex-weixin-runtime/node_modules/codex-weixin",
+      global: false
+    }
+  );
+  assert.deepEqual(
+    resolveNpmInstallTarget("C:\\Users\\THU\\AppData\\Roaming\\npm\\node_modules\\codex-weixin", "win32"),
+    {
+      installPrefix: "C:\\Users\\THU\\AppData\\Roaming\\npm",
+      packageRoot: "C:\\Users\\THU\\AppData\\Roaming\\npm\\node_modules\\codex-weixin",
+      global: true
+    }
+  );
   assert.equal(
     resolveNpmInstallPrefix("/opt/homebrew/lib/node_modules/codex-weixin", "darwin"),
-    "/opt/homebrew/lib"
+    "/opt/homebrew"
   );
   assert.equal(
     resolveNpmInstallPrefix("C:\\Users\\THU\\work\\codex-weixin-runtime\\node_modules\\codex-weixin", "win32"),
     "C:\\Users\\THU\\work\\codex-weixin-runtime"
   );
   assert.equal(resolveNpmInstallPrefix("/workspace/codex-weixin", "darwin"), undefined);
+  assert.equal(resolveNpmInstallTarget("/workspace/codex-weixin", "darwin"), undefined);
 });
 
 test("releases a Windows cwd lock only when the service runs inside its package", () => {
@@ -210,6 +249,17 @@ test("releases a Windows cwd lock only when the service runs inside its package"
     chdir: (directory) => changedDirectories.push(directory)
   }), false);
   assert.equal(changedDirectories.length, 1);
+});
+
+test("releases a macOS global package cwd lock using its actual package root", () => {
+  const changedDirectories: string[] = [];
+  assert.equal(releaseRuntimeDirectoryLock("/opt/homebrew", {
+    packageRoot: "/opt/homebrew/lib/node_modules/codex-weixin",
+    currentWorkingDirectory: "/opt/homebrew/lib/node_modules/codex-weixin/dist/server",
+    platform: "darwin",
+    chdir: (directory) => changedDirectories.push(directory)
+  }), true);
+  assert.deepEqual(changedDirectories, ["/opt/homebrew"]);
 });
 
 test("converts unsigned Windows npm exit codes back to signed libuv errors", () => {

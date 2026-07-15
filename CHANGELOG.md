@@ -2,6 +2,18 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.2] - 2026-07-16
+
+### Fixed
+
+- Fixed Windows Web updates treating a shared global npm prefix as a local project, which could attempt to move other global packages such as a running `@openai/codex` executable and fail with `EBUSY / -4082`.
+- Detected Windows and Unix global npm layouts and updated them with an explicit `--global --prefix`, while preserving the existing layout for isolated Unix runtimes.
+- Used the active package root consistently for cwd lock release and post-install verification across global and isolated layouts.
+
+### Upgrade Note
+
+- An affected Windows service still running an older updater from a shared global npm prefix cannot apply this fix to itself. Stop the service once, run `npm install -g codex-weixin@0.3.2` from outside the package directory, and start `codex-weixin` again. Services already moved to an isolated runtime can update normally from the Web page.
+
 ## [0.3.1] - 2026-07-16
 
 ### Fixed
@@ -142,6 +154,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.2]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.2
 [0.3.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.1
 [0.3.0]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.0
 [0.2.9]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.9

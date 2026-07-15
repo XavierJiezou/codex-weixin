@@ -48,6 +48,12 @@ export type UpdateManagerOptions = {
   nodePath?: string;
 };
 
+export type NpmInstallTarget = {
+  installPrefix: string;
+  packageRoot: string;
+  global: boolean;
+};
+
 export class UpdateManager implements UpdateService {
   private readonly fetchImpl: typeof globalThis.fetch;
   private readonly installImpl: (version: string, registry: UpdateRegistryId) => Promise<void>;
@@ -61,9 +67,9 @@ export class UpdateManager implements UpdateService {
   constructor(private readonly options: UpdateManagerOptions) {
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     const platform = options.platform ?? process.platform;
-    const installPrefix = resolveNpmInstallPrefix(options.packageRoot ?? CURRENT_PACKAGE_ROOT, platform);
+    const installTarget = resolveNpmInstallTarget(options.packageRoot ?? CURRENT_PACKAGE_ROOT, platform);
     this.installImpl = options.install ?? ((version, registry) => installCurrentRuntimeVersion(version, registry, {
-      installPrefix,
+      installTarget,
       platform,
       env: options.env ?? process.env,
       nodePath: options.nodePath ?? process.execPath
@@ -194,6 +200,7 @@ export function buildNpmInstallCommand(
   registry: UpdateRegistryId,
   options: {
     installPrefix: string;
+    global?: boolean;
     platform?: NodeJS.Platform;
     env?: NodeJS.ProcessEnv;
     nodePath?: string;
@@ -207,6 +214,7 @@ export function buildNpmInstallCommand(
   const installPrefix = requireInstallPrefix(options.installPrefix, platform);
   const installArgs = [
     "install",
+    ...(options.global ? ["--global"] : []),
     "--prefix",
     installPrefix,
     "--no-save",
@@ -233,18 +241,32 @@ export function resolveNpmInstallPrefix(
   packageRoot: string,
   platform: NodeJS.Platform = process.platform
 ): string | undefined {
+  return resolveNpmInstallTarget(packageRoot, platform)?.installPrefix;
+}
+
+export function resolveNpmInstallTarget(
+  packageRoot: string,
+  platform: NodeJS.Platform = process.platform
+): NpmInstallTarget | undefined {
   const pathApi = platform === "win32" ? path.win32 : path.posix;
   if (!pathApi.isAbsolute(packageRoot)) return undefined;
   const normalizedRoot = pathApi.resolve(packageRoot);
   if (pathApi.basename(normalizedRoot).toLowerCase() !== "codex-weixin") return undefined;
   const nodeModulesDir = pathApi.dirname(normalizedRoot);
   if (pathApi.basename(nodeModulesDir).toLowerCase() !== "node_modules") return undefined;
-  return pathApi.dirname(nodeModulesDir);
+  const packagePrefix = pathApi.dirname(nodeModulesDir);
+  const global = platform === "win32" || pathApi.basename(packagePrefix).toLowerCase() === "lib";
+  return {
+    installPrefix: global && platform !== "win32" ? pathApi.dirname(packagePrefix) : packagePrefix,
+    packageRoot: normalizedRoot,
+    global
+  };
 }
 
 export function releaseRuntimeDirectoryLock(
   installPrefix: string,
   options: {
+    packageRoot?: string;
     currentWorkingDirectory?: string;
     platform?: NodeJS.Platform;
     chdir?: (directory: string) => void;
@@ -254,12 +276,16 @@ export function releaseRuntimeDirectoryLock(
   const pathApi = platform === "win32" ? path.win32 : path.posix;
   const safePrefix = requireInstallPrefix(installPrefix, platform);
   const comparablePrefix = resolveComparablePath(safePrefix, platform, pathApi);
+  const packageRoot = resolveComparablePath(
+    options.packageRoot ?? pathApi.join(comparablePrefix, "node_modules", "codex-weixin"),
+    platform,
+    pathApi
+  );
   const currentWorkingDirectory = resolveComparablePath(
     options.currentWorkingDirectory ?? process.cwd(),
     platform,
     pathApi
   );
-  const packageRoot = pathApi.join(comparablePrefix, "node_modules", "codex-weixin");
   const relative = pathApi.relative(packageRoot, currentWorkingDirectory);
   const insidePackage = relative === ""
     || (relative !== ".." && !relative.startsWith(`..${pathApi.sep}`) && !pathApi.isAbsolute(relative));
@@ -282,25 +308,30 @@ async function installCurrentRuntimeVersion(
   version: string,
   registry: UpdateRegistryId,
   options: {
-    installPrefix?: string;
+    installTarget?: NpmInstallTarget;
     platform: NodeJS.Platform;
     env: NodeJS.ProcessEnv;
     nodePath: string;
   }
 ): Promise<void> {
-  if (!options.installPrefix) {
+  if (!options.installTarget) {
     throw new Error("源码运行方式不支持网页自动安装，请更新 Git 源码、执行 npm install 和 npm run build 后重启");
   }
-  releaseRuntimeDirectoryLock(options.installPrefix, { platform: options.platform });
+  const target = options.installTarget;
+  releaseRuntimeDirectoryLock(target.installPrefix, {
+    packageRoot: target.packageRoot,
+    platform: options.platform
+  });
   const command = buildNpmInstallCommand(version, registry, {
-    installPrefix: options.installPrefix,
+    installPrefix: target.installPrefix,
+    global: target.global,
     platform: options.platform,
     env: options.env,
     nodePath: options.nodePath
   });
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command.command, command.args, {
-      cwd: options.installPrefix,
+      cwd: target.installPrefix,
       env: options.env,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
@@ -329,7 +360,7 @@ async function installCurrentRuntimeVersion(
       settled = true;
       if (code === 0) {
         try {
-          verifyInstalledRuntime(options.installPrefix!, version);
+          verifyInstalledRuntime(target.packageRoot, version);
           resolve();
         } catch (error) {
           reject(error);
@@ -352,8 +383,7 @@ export function describeInstallFailure(code: number | null, output: string, plat
   return `npm update failed with exit code ${normalizedCode ?? "unknown"}.${permissionHint}`;
 }
 
-function verifyInstalledRuntime(installPrefix: string, version: string): void {
-  const packageRoot = path.join(installPrefix, "node_modules", "codex-weixin");
+function verifyInstalledRuntime(packageRoot: string, version: string): void {
   const packageJsonPath = path.join(packageRoot, "package.json");
   const entryPath = path.join(packageRoot, "dist", "server", "index.js");
   try {
