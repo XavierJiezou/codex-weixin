@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildNpmInstallCommand,
   isNewerVersion,
+  resolveNpmInstallPrefix,
   UpdateManager
 } from "../src/server/update-manager.js";
 
@@ -138,21 +139,69 @@ test("installs only the server-verified latest version and rejects concurrent up
 });
 
 test("builds fixed cross-platform npm install commands", () => {
-  assert.deepEqual(buildNpmInstallCommand("1.2.4", "npmmirror", "darwin", {}, "/node"), {
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "npmmirror", {
+    installPrefix: "/opt/homebrew/lib",
+    platform: "darwin",
+    env: {},
+    nodePath: "/node"
+  }), {
     command: "npm",
-    args: ["install", "--global", "codex-weixin@1.2.4", "--registry=https://registry.npmmirror.com", "--no-audit", "--no-fund"]
+    args: ["install", "--prefix", "/opt/homebrew/lib", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmmirror.com", "--no-audit", "--no-fund"]
   });
-  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", "win32", { ComSpec: "C:\\Windows\\cmd.exe" }, "C:\\node.exe"), {
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
+    installPrefix: "C:\\Users\\THU\\codex-weixin-runtime",
+    platform: "win32",
+    env: { ComSpec: "C:\\Windows\\cmd.exe" },
+    nodePath: "C:\\node.exe"
+  }), {
     command: "C:\\Windows\\cmd.exe",
-    args: ["/d", "/s", "/c", "npm", "install", "--global", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+    args: ["/d", "/s", "/c", "npm", "install", "--prefix", "C:\\Users\\THU\\codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
   });
-  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", "win32", { npm_execpath: "C:\\npm\\npm-cli.js" }, "C:\\node.exe"), {
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
+    installPrefix: "C:\\Users\\THU\\codex-weixin-runtime",
+    platform: "win32",
+    env: { npm_execpath: "C:\\npm\\npm-cli.js" },
+    nodePath: "C:\\node.exe"
+  }), {
     command: "C:\\node.exe",
-    args: ["C:\\npm\\npm-cli.js", "install", "--global", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+    args: ["C:\\npm\\npm-cli.js", "install", "--prefix", "C:\\Users\\THU\\codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
   });
-  assert.throws(() => buildNpmInstallCommand("latest", "official"), /Invalid stable version/);
   assert.throws(
-    () => buildNpmInstallCommand("1.2.4", "https://registry.example.com" as never),
+    () => buildNpmInstallCommand("latest", "official", { installPrefix: "/runtime" }),
+    /Invalid stable version/
+  );
+  assert.throws(
+    () => buildNpmInstallCommand("1.2.4", "https://registry.example.com" as never, { installPrefix: "/runtime" }),
     /Invalid npm Registry/
+  );
+  assert.throws(
+    () => buildNpmInstallCommand("1.2.4", "official", { installPrefix: "relative/runtime" }),
+    /Invalid npm install prefix/
+  );
+});
+
+test("resolves the npm prefix that owns the active package on macOS and Windows", () => {
+  assert.equal(
+    resolveNpmInstallPrefix("/opt/homebrew/lib/node_modules/codex-weixin", "darwin"),
+    "/opt/homebrew/lib"
+  );
+  assert.equal(
+    resolveNpmInstallPrefix("C:\\Users\\THU\\work\\codex-weixin-runtime\\node_modules\\codex-weixin", "win32"),
+    "C:\\Users\\THU\\work\\codex-weixin-runtime"
+  );
+  assert.equal(resolveNpmInstallPrefix("/workspace/codex-weixin", "darwin"), undefined);
+});
+
+test("rejects Web installation when running from a source checkout", async () => {
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    packageRoot: "/workspace/codex-weixin",
+    platform: "darwin",
+    fetch: async () => new Response(JSON.stringify({ version: "1.2.4" }), { status: 200 })
+  });
+
+  await assert.rejects(
+    manager.installLatest(),
+    /不支持网页自动安装/
   );
 });

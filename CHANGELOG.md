@@ -2,6 +2,23 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.2.9] - 2026-07-15
+
+### Changed
+
+- Replaced the update dialog arrow with a quiet vertical divider between the current and latest versions.
+- Changed Web updates to install into the npm prefix that owns the running `codex-weixin` package instead of always installing globally.
+
+### Fixed
+
+- Fixed Windows and other isolated local runtimes restarting the old package after npm had successfully updated an unrelated global copy.
+- Verified the installed package version and server entry point before stopping the old service, preventing false successful-update responses.
+- Rejected Web installation from source checkouts with an actionable message instead of mutating or restarting the wrong installation.
+
+### Upgrade Note
+
+- Users already running 0.2.8 or earlier from an isolated local runtime must update that runtime to 0.2.9 once manually; subsequent Web updates will target the correct runtime automatically.
+
 ## [0.2.8] - 2026-07-15
 
 ### Added
@@ -110,6 +127,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.2.9]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.9
 [0.2.8]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.8
 [0.2.7]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.7
 [0.2.6]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.2.6

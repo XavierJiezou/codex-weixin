@@ -38,7 +38,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | ✅ | Process progress | Enabled by default; Codex progress reaches WeChat immediately and appears in a collapsible Web timeline with elapsed time, while final answers stay intact. | Pending: `docs/images/screenshots/web-process-progress.png` |
 | ✅ | Typing state and deduplication | Web typing state plus persistent sync cursors and message IDs prevent duplicate replies. | Pending: `docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server first | New and resumed sessions prefer Codex app-server V2 and fall back to `codex exec` when unavailable. | Pending: `docs/images/screenshots/wechat-status.png` |
-| ✅ | Web auto-update | Automatically selects npm or npmmirror, supports automatic and manual checks in Settings, then installs, restarts, and reconnects. | Pending: `docs/images/screenshots/web-auto-update.png` |
+| ✅ | Web auto-update | Selects npm or npmmirror, updates the active npm runtime, verifies it, then restarts and reconnects. | Pending: `docs/images/screenshots/web-auto-update.png` |
 
 ## Web management preview
 
@@ -206,5 +206,7 @@ npm run build
 ```
 
 The project is a clean-room independent implementation under the MIT License. Its iLink integration shape references `Tencent/openclaw-weixin`, along with public Codex/WeChat projects for app-server, media-transfer, and security-boundary practices. No AGPL source code was copied.
+
+When started from a source checkout with `npm run dev` or `npm start`, the Web page checks for updates but does not install them; update the Git checkout and rebuild instead. Global installations and isolated `node_modules/codex-weixin` runtimes update the npm prefix that owns the active package and verify the target version and service entry before restarting.
 
 See [CHANGELOG.md](./CHANGELOG.md) for release history.

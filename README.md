@@ -40,7 +40,7 @@
 | ✅ | 过程进度 | 默认开启；Codex 处理过程实时发送到微信，并在 Web 中折叠显示处理用时，最终答案保持完整。 | 待补：`docs/images/screenshots/web-process-progress.png` |
 | ✅ | 输入状态与去重 | Web 显示“对方正在输入…”，并持久记录同步游标和消息 ID，防止重复回复。 | 待补：`docs/images/screenshots/wechat-typing.png` |
 | ✅ | App-server 优先 | 新旧会话优先使用 Codex app-server V2；不可用时自动回退到 `codex exec`。 | 待补：`docs/images/screenshots/wechat-status.png` |
-| ✅ | Web 自动更新 | 后台自动选择 npm 官方源或 npmmirror；支持自动检查和设置页手动检查，并可安装、重启和恢复连接。 | 待补：`docs/images/screenshots/web-auto-update.png` |
+| ✅ | Web 自动更新 | 自动选择 npm 官方源或 npmmirror，更新当前实际运行的 npm runtime，校验后重启并恢复连接。 | 待补：`docs/images/screenshots/web-auto-update.png` |
 
 ## Web 管理页预览
 
@@ -214,6 +214,8 @@ npm run build
 ```
 
 开发入口同样只启动本机 Web 服务。浏览器页面、JSON API、多账号运行时、扫码状态机和受管会话都有自动化测试。
+
+源码目录通过 `npm run dev` 或 `npm start` 启动时，Web 只检查新版本，不会自动安装；请通过 Git 更新源码后重新构建。全局安装和独立 `node_modules/codex-weixin` runtime 会更新当前实际运行的 npm prefix，并在重启前验证目标版本和服务入口。
 
 ## 参考与许可
 

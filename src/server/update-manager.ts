@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import type { Readable } from "node:stream";
+import { fileURLToPath } from "node:url";
 
 const UPDATE_REGISTRY_URLS = {
   official: "https://registry.npmjs.org",
@@ -9,6 +12,7 @@ const UPDATE_REGISTRY_IDS = Object.keys(UPDATE_REGISTRY_URLS) as UpdateRegistryI
 const MAX_REGISTRY_RESPONSE_BYTES = 64 * 1024;
 const MAX_INSTALL_OUTPUT_BYTES = 20 * 1024;
 const STABLE_VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const CURRENT_PACKAGE_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 export type UpdateRegistryId = keyof typeof UPDATE_REGISTRY_URLS;
 
@@ -38,6 +42,10 @@ export type UpdateManagerOptions = {
   now?: () => number;
   cacheTtlMs?: number;
   checkTimeoutMs?: number;
+  packageRoot?: string;
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+  nodePath?: string;
 };
 
 export class UpdateManager implements UpdateService {
@@ -52,7 +60,14 @@ export class UpdateManager implements UpdateService {
 
   constructor(private readonly options: UpdateManagerOptions) {
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
-    this.installImpl = options.install ?? installGlobalVersion;
+    const platform = options.platform ?? process.platform;
+    const installPrefix = resolveNpmInstallPrefix(options.packageRoot ?? CURRENT_PACKAGE_ROOT, platform);
+    this.installImpl = options.install ?? ((version, registry) => installCurrentRuntimeVersion(version, registry, {
+      installPrefix,
+      platform,
+      env: options.env ?? process.env,
+      nodePath: options.nodePath ?? process.execPath
+    }));
     this.now = options.now ?? (() => Date.now());
     this.cacheTtlMs = options.cacheTtlMs ?? 30 * 60 * 1000;
     this.checkTimeoutMs = options.checkTimeoutMs ?? 5_000;
@@ -177,15 +192,25 @@ export function isNewerVersion(currentVersion: string, candidateVersion: string)
 export function buildNpmInstallCommand(
   version: string,
   registry: UpdateRegistryId,
-  platform: NodeJS.Platform = process.platform,
-  env: NodeJS.ProcessEnv = process.env,
-  nodePath = process.execPath
+  options: {
+    installPrefix: string;
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    nodePath?: string;
+  }
 ): { command: string; args: string[] } {
   const safeVersion = requireStableVersion(version);
   const safeRegistry = requireRegistryId(registry);
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  const nodePath = options.nodePath ?? process.execPath;
+  const installPrefix = requireInstallPrefix(options.installPrefix, platform);
   const installArgs = [
     "install",
-    "--global",
+    "--prefix",
+    installPrefix,
+    "--no-save",
+    "--package-lock=false",
     `codex-weixin@${safeVersion}`,
     `--registry=${UPDATE_REGISTRY_URLS[safeRegistry]}`,
     "--no-audit",
@@ -204,11 +229,41 @@ export function buildNpmInstallCommand(
   return { command: "npm", args: installArgs };
 }
 
-async function installGlobalVersion(version: string, registry: UpdateRegistryId): Promise<void> {
-  const command = buildNpmInstallCommand(version, registry);
+export function resolveNpmInstallPrefix(
+  packageRoot: string,
+  platform: NodeJS.Platform = process.platform
+): string | undefined {
+  const pathApi = platform === "win32" ? path.win32 : path.posix;
+  if (!pathApi.isAbsolute(packageRoot)) return undefined;
+  const normalizedRoot = pathApi.resolve(packageRoot);
+  if (pathApi.basename(normalizedRoot).toLowerCase() !== "codex-weixin") return undefined;
+  const nodeModulesDir = pathApi.dirname(normalizedRoot);
+  if (pathApi.basename(nodeModulesDir).toLowerCase() !== "node_modules") return undefined;
+  return pathApi.dirname(nodeModulesDir);
+}
+
+async function installCurrentRuntimeVersion(
+  version: string,
+  registry: UpdateRegistryId,
+  options: {
+    installPrefix?: string;
+    platform: NodeJS.Platform;
+    env: NodeJS.ProcessEnv;
+    nodePath: string;
+  }
+): Promise<void> {
+  if (!options.installPrefix) {
+    throw new Error("源码运行方式不支持网页自动安装，请更新 Git 源码、执行 npm install 和 npm run build 后重启");
+  }
+  const command = buildNpmInstallCommand(version, registry, {
+    installPrefix: options.installPrefix,
+    platform: options.platform,
+    env: options.env,
+    nodePath: options.nodePath
+  });
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command.command, command.args, {
-      env: process.env,
+      env: options.env,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
@@ -235,15 +290,32 @@ async function installGlobalVersion(version: string, registry: UpdateRegistryId)
       if (settled) return;
       settled = true;
       if (code === 0) {
-        resolve();
+        try {
+          verifyInstalledRuntime(options.installPrefix!, version);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
         return;
       }
       const permissionHint = /EACCES|EPERM|permission/i.test(output)
-        ? " npm does not have permission to update the global package."
+        ? " npm does not have permission to update the current codex-weixin runtime."
         : "";
       reject(new Error(`npm update failed with exit code ${code ?? "unknown"}.${permissionHint}`));
     }));
   });
+}
+
+function verifyInstalledRuntime(installPrefix: string, version: string): void {
+  const packageRoot = path.join(installPrefix, "node_modules", "codex-weixin");
+  const packageJsonPath = path.join(packageRoot, "package.json");
+  const entryPath = path.join(packageRoot, "dist", "server", "index.js");
+  try {
+    const value = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
+    if (value.version !== version || !fs.existsSync(entryPath)) throw new Error("version mismatch");
+  } catch {
+    throw new Error("npm completed, but the active codex-weixin runtime was not updated");
+  }
 }
 
 function finishInstall(child: { stdout: Readable; stderr: Readable }, timer: NodeJS.Timeout, finish: () => void): void {
@@ -267,6 +339,14 @@ function requireStableVersion(value: unknown): string {
 function requireRegistryId(value: unknown): UpdateRegistryId {
   if (value === "official" || value === "npmmirror") return value;
   throw new Error("Invalid npm Registry");
+}
+
+function requireInstallPrefix(value: unknown, platform: NodeJS.Platform): string {
+  const pathApi = platform === "win32" ? path.win32 : path.posix;
+  if (typeof value !== "string" || !pathApi.isAbsolute(value)) {
+    throw new Error("Invalid npm install prefix");
+  }
+  return pathApi.resolve(value);
 }
 
 function parseStableVersion(value: string): [number, number, number] {
