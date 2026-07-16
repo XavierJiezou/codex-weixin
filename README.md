@@ -221,3 +221,7 @@ npm run build
 项目是独立实现，微信 iLink 接入形态参考 `Tencent/openclaw-weixin`，并参考了公开的 Codex/微信桥接项目在 Codex app-server、媒体传输和安全边界方面的实践。项目未复制 AGPL 项目源码，使用 MIT License。
 
 版本变更见 [CHANGELOG.md](./CHANGELOG.md)。
+
+## Community
+
+感谢 [LINUX DO](https://linux.do/) 社区佬友的支持与反馈。
