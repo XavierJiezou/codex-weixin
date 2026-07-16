@@ -306,6 +306,48 @@
     </form>
   </dialog>
 
+  <dialog class="modal account-removal-modal" id="removeAccountDialog" aria-labelledby="removeAccountDialogTitle">
+    <form id="removeAccountForm" method="dialog">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">REMOVE ACCOUNT</p>
+          <h2 id="removeAccountDialogTitle">移除微信账号</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog="removeAccountDialog" title="关闭" aria-label="关闭移除账号窗口">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <input id="removingAccountId" type="hidden">
+      <div class="modal-body account-removal-body">
+        <p class="account-removal-lead">选择如何处理 <strong id="removingAccountName">此微信账号</strong> 的会话数据。</p>
+        <div class="account-removal-choices" role="radiogroup" aria-label="会话历史处理方式">
+          <label class="account-removal-choice">
+            <input type="radio" name="retainHistory" value="true" checked>
+            <span class="account-removal-option">
+              <span class="account-removal-option-icon" aria-hidden="true"><i data-lucide="archive-restore"></i></span>
+              <span><strong>保留会话历史</strong><small>账号从页面移除；同一用户重新扫码后恢复备注、授权和历史会话。</small></span>
+            </span>
+          </label>
+          <label class="account-removal-choice is-destructive">
+            <input type="radio" name="retainHistory" value="false">
+            <span class="account-removal-option">
+              <span class="account-removal-option-icon" aria-hidden="true"><i data-lucide="trash-2"></i></span>
+              <span><strong>彻底删除历史</strong><small>删除本服务保存的授权和会话状态，重新扫码后不会恢复。</small></span>
+            </span>
+          </label>
+        </div>
+        <p class="account-removal-note"><i data-lucide="shield-check"></i><span>登录凭据始终会从本机删除；保留时不会保存 token。</span></p>
+      </div>
+      <div class="modal-footer">
+        <button class="button button-secondary" type="button" data-close-dialog="removeAccountDialog">取消</button>
+        <button class="button button-danger" type="submit">
+          <i data-lucide="user-minus"></i>
+          <span>移除账号</span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="modal session-modal" id="sessionDialog">
     <form id="sessionForm" method="dialog">
       <div class="modal-header">

@@ -16,6 +16,13 @@ export type WeixinAccount = {
   enabled: boolean;
 };
 
+export type RetainedWeixinAccount = {
+  accountId: string;
+  userId: string;
+  displayName?: string;
+  retainedAt: string;
+};
+
 export const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com";
 export const DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 
@@ -47,18 +54,72 @@ export function saveScannedAccount(
   const sameUsers = scanned.userId
     ? accounts.filter((account) => account.userId === scanned.userId)
     : [];
+  const retainedMatches = scanned.userId
+    ? listRetainedAccounts(paths).filter((account) => account.userId === scanned.userId)
+    : [];
+  const retained = !target && !exact && sameUsers.length === 0 && retainedMatches.length === 1
+    ? retainedMatches[0]
+    : undefined;
   const existing = target ?? exact ?? (sameUsers.length === 1 ? sameUsers[0] : undefined);
+  const previous = existing ?? retained;
   const botId = scanned.botId ?? scanned.accountId;
-  const account: WeixinAccount = existing ? {
+  const account: WeixinAccount = previous ? {
     ...scanned,
-    accountId: existing.accountId,
+    accountId: previous.accountId,
     botId,
-    userId: scanned.userId ?? existing.userId,
-    ...(existing.displayName ? { displayName: existing.displayName } : {}),
+    userId: scanned.userId ?? previous.userId,
+    ...(previous.displayName ? { displayName: previous.displayName } : {}),
     enabled: true
   } : { ...scanned, botId };
   saveAccount(paths, account);
-  return { account, reusedExisting: Boolean(existing) };
+  if (retained) forgetRetainedAccount(paths, retained);
+  return { account, reusedExisting: Boolean(previous) };
+}
+
+export function listRetainedAccounts(paths: StatePaths): RetainedWeixinAccount[] {
+  const value = readJsonFile<unknown>(paths.retainedAccountsPath, []);
+  if (!Array.isArray(value)) return [];
+  return value.filter((account): account is RetainedWeixinAccount => Boolean(
+    account
+    && typeof account === "object"
+    && typeof account.accountId === "string"
+    && typeof account.userId === "string"
+    && typeof account.retainedAt === "string"
+    && (account.displayName === undefined || typeof account.displayName === "string")
+  )).sort((a, b) => a.accountId.localeCompare(b.accountId));
+}
+
+export function retainAccountHistory(paths: StatePaths, account: WeixinAccount): RetainedWeixinAccount {
+  if (!account.userId) {
+    throw new Error("该微信账号缺少稳定用户标识，无法保留会话历史；请选择彻底删除");
+  }
+  const retained: RetainedWeixinAccount = {
+    accountId: account.accountId,
+    userId: account.userId,
+    ...(account.displayName ? { displayName: account.displayName } : {}),
+    retainedAt: new Date().toISOString()
+  };
+  const accounts = listRetainedAccounts(paths)
+    .filter((candidate) => candidate.accountId !== account.accountId && candidate.userId !== account.userId);
+  accounts.push(retained);
+  writeJsonFile(paths.retainedAccountsPath, accounts.sort((a, b) => a.accountId.localeCompare(b.accountId)));
+  return retained;
+}
+
+export function forgetRetainedAccount(
+  paths: StatePaths,
+  account: Pick<RetainedWeixinAccount, "accountId" | "userId">
+): void {
+  const accounts = listRetainedAccounts(paths);
+  const remaining = accounts.filter((candidate) => (
+    candidate.accountId !== account.accountId && candidate.userId !== account.userId
+  ));
+  if (remaining.length === accounts.length) return;
+  if (remaining.length) {
+    writeJsonFile(paths.retainedAccountsPath, remaining);
+  } else {
+    fs.rmSync(paths.retainedAccountsPath, { force: true });
+  }
 }
 
 export function listAccounts(paths: StatePaths): WeixinAccount[] {

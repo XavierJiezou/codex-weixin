@@ -29,7 +29,7 @@
 | 状态 | 功能 | 说明 | 截图 |
 | --- | --- | --- | --- |
 | ✅ | 本机 Web 管理 | 页面只监听 `127.0.0.1`，集中管理微信账号、会话、工作目录和 Codex 设置。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
-| ✅ | 多微信账号 | 一个服务并行运行多个微信账号，支持本机备注、独立授权、独立附件与会话状态。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
+| ✅ | 多微信账号 | 一个服务并行运行多个微信账号，支持本机备注、独立授权、独立附件与会话状态；移除账号时可选择保留历史。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
 | ✅ | 网页扫码接入 | 显示等待扫码、已扫码、已连接和二维码过期状态。 | 待补：`docs/images/screenshots/wechat-qr-login.png` |
 | ✅ | 会话管理 | 按微信账号分类，查看 Markdown 历史并继续同一 Codex thread；支持新建、重命名、切换、重置和删除。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
 | ✅ | Web 文本与附件 | 一次发送文本和最多 10 个文件（合计 50 MB），历史中可播放、预览或下载媒体。 | 待补：`docs/images/screenshots/web-attachments.png` |
@@ -93,7 +93,7 @@ npm start
 4. 回到“微信账号”，允许页面中出现的待授权联系人。
 5. 再次从微信发送消息，Codex 会在默认工作目录中开始处理。
 
-继续添加账号时重复扫码即可。每个账号都有独立的轮询任务、联系人授权、入站文件和会话状态；单个账号发生错误不会停止其他账号。同一个微信账号因登录过期等原因重新扫码时，会刷新原账号凭据并保留本机备注、授权和会话，不会创建新的空账号。
+继续添加账号时重复扫码即可。每个账号都有独立的轮询任务、联系人授权、入站文件和会话状态；单个账号发生错误不会停止其他账号。同一个微信账号因登录过期等原因重新扫码时，会刷新原账号凭据并保留本机备注、授权和会话，不会创建新的空账号。移除账号时可以保留会话历史；登录凭据会立即删除，同一微信用户以后重新扫码时会恢复原备注、授权和受管会话。
 
 ## 会话管理
 
@@ -168,6 +168,7 @@ IkunCoding 提供方会额外显示 `gpt-5.6-sol`、`gpt-5.6-terra` 和 `gpt-5.6
 ```text
 ~/.codex-weixin/
   accounts/                 微信账号凭据，每个账号一个文件
+  retained-accounts.json    已移除账号的恢复索引，不包含 token
   runtime/<account-id>/     联系人授权和受管会话状态
   inbound/<account-id>/     微信入站附件
   config.json               Codex 和工作区配置

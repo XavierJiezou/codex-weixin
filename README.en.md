@@ -27,7 +27,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | Status | Feature | Details | Screenshot |
 | --- | --- | --- | --- |
 | ✅ | Local Web management | A `127.0.0.1`-only page manages WeChat accounts, sessions, workspaces, and Codex settings. | [Web sessions](docs/images/screenshots/web-session-management.png) |
-| ✅ | Multiple WeChat accounts | One service runs multiple accounts with local remarks and isolated authorization, attachments, and sessions. | [Web sessions](docs/images/screenshots/web-session-management.png) |
+| ✅ | Multiple WeChat accounts | One service runs multiple accounts with local remarks and isolated authorization, attachments, and sessions; account removal can retain history. | [Web sessions](docs/images/screenshots/web-session-management.png) |
 | ✅ | Browser QR connection | Shows waiting, scanned, connected, and expired QR states. | Pending: `docs/images/screenshots/wechat-qr-login.png` |
 | ✅ | Session management | Grouped account tabs, Markdown history, continued Codex threads, and create, rename, activate, reset, and delete actions. | [Web sessions](docs/images/screenshots/web-session-management.png) |
 | ✅ | Web text and attachments | Send text with up to 10 files (50 MB total), with media playback, preview, and download in history. | Pending: `docs/images/screenshots/web-attachments.png` |
@@ -92,7 +92,7 @@ npm start
 4. Return to WeChat Accounts and allow the pending sender.
 5. Send the message again to start a Codex turn.
 
-Repeat the QR flow to add more accounts. Every account has its own monitor, sender authorization, inbound directory, and managed-session state. A failed account does not stop the others. Scanning the same WeChat account again after an expired login refreshes the existing credentials while preserving its local remark, authorization, and sessions instead of creating an empty duplicate.
+Repeat the QR flow to add more accounts. Every account has its own monitor, sender authorization, inbound directory, and managed-session state. A failed account does not stop the others. Scanning the same WeChat account again after an expired login refreshes the existing credentials while preserving its local remark, authorization, and sessions instead of creating an empty duplicate. Account removal can retain history: credentials are deleted immediately, while a later scan by the same WeChat user restores the previous remark, authorization, and managed sessions.
 
 ## Session management
 
@@ -167,6 +167,7 @@ Service state and the default Codex workspace share this directory:
 ```text
 ~/.codex-weixin/
   accounts/                 One credential file per WeChat account
+  retained-accounts.json    Recovery index for removed accounts; never stores tokens
   runtime/<account-id>/     Sender authorization and managed sessions
   inbound/<account-id>/     Inbound WeChat attachments
   config.json               Codex and workspace configuration

@@ -9,7 +9,7 @@ import { AccountManager } from "../src/server/account-manager.js";
 import { defaultConfig } from "../src/state/config.js";
 import { accountStatePaths, resolveStatePaths } from "../src/state/paths.js";
 import { RuntimeStateStore } from "../src/state/runtime-state.js";
-import { loadAccount, saveAccount } from "../src/weixin/accounts.js";
+import { listRetainedAccounts, loadAccount, saveAccount } from "../src/weixin/accounts.js";
 
 function setup(t: test.TestContext) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-manager-"));
@@ -18,6 +18,7 @@ function setup(t: test.TestContext) {
   for (const accountId of ["account-one", "account-two"]) {
     saveAccount(paths, {
       accountId,
+      userId: `user-${accountId}`,
       token: `token-${accountId}`,
       baseUrl: "https://example.test",
       cdnBaseUrl: "https://cdn.example.test",
@@ -151,6 +152,29 @@ test("persists and clears a local account display name", (t) => {
   const cleared = manager.renameAccount("account-one", "   ");
   assert.equal(cleared.displayName, undefined);
   assert.equal(loadAccount(paths, "account-one").displayName, undefined);
+});
+
+test("optionally retains account sessions when removing a WeChat account", async (t) => {
+  const { manager, paths, root } = setup(t);
+  manager.renameAccount("account-one", "张三");
+  manager.allowSender("account-one", "alice@im.wechat");
+  manager.createSession("account-one", "alice@im.wechat", root, "历史会话");
+  const retainedStatePath = accountStatePaths(paths, "account-one").statePath;
+
+  await manager.removeAccount("account-one", { retainHistory: true });
+
+  assert.deepEqual(manager.listAccounts().map((account) => account.accountId), ["account-two"]);
+  assert.equal(fs.existsSync(retainedStatePath), true);
+  assert.deepEqual(listRetainedAccounts(paths).map((account) => ({
+    accountId: account.accountId,
+    userId: account.userId,
+    displayName: account.displayName
+  })), [{ accountId: "account-one", userId: "user-account-one", displayName: "张三" }]);
+
+  const removedState = new RuntimeStateStore(accountStatePaths(paths, "account-two"));
+  removedState.createSession("bob@im.wechat", root, "删除的会话");
+  await manager.removeAccount("account-two", { retainHistory: false });
+  assert.equal(fs.existsSync(path.dirname(accountStatePaths(paths, "account-two").statePath)), false);
 });
 
 test("reports the effective Codex model and reasoning effort", async (t) => {

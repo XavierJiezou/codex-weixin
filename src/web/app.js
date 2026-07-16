@@ -68,6 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateCheckButton: document.querySelector("#updateCheckButton"),
     settingsVersionValue: document.querySelector("#settingsVersionValue"),
     accountDialog: document.querySelector("#accountDialog"),
+    removeAccountDialog: document.querySelector("#removeAccountDialog"),
     sessionDialog: document.querySelector("#sessionDialog")
   });
   bindEvents();
@@ -87,6 +88,7 @@ function bindEvents() {
   els.sessionEffortInput.addEventListener("change", () => void saveSessionRuntimeSettings());
   els.sessionStreamInput.addEventListener("change", () => void saveSessionRuntimeSettings());
   document.querySelector("#accountForm").addEventListener("submit", (event) => void saveAccountRemark(event));
+  document.querySelector("#removeAccountForm").addEventListener("submit", (event) => void removeAccount(event));
   document.querySelector("#sessionForm").addEventListener("submit", (event) => void saveSession(event));
   document.querySelector("#sessionSenderInput").addEventListener("change", updateNewSessionDefaultTitle);
   els.chatComposer.addEventListener("submit", (event) => void sendSessionMessage(event));
@@ -559,6 +561,10 @@ async function handleAccountAction(event) {
     if (account) openAccountRemarkDialog(account);
     return;
   }
+  if (action === "remove") {
+    if (account) openRemoveAccountDialog(account);
+    return;
+  }
   try {
     button.disabled = true;
     if (action === "start" || action === "stop") await api(`/api/accounts/${encodeURIComponent(accountId)}/${action}`, { method: "POST" });
@@ -571,10 +577,6 @@ async function handleAccountAction(event) {
         `/api/accounts/${encodeURIComponent(accountId)}/senders/${encodeURIComponent(senderId)}/remove`,
         { method: "POST" }
       )));
-    }
-    if (action === "remove") {
-      if (!window.confirm("移除此微信账号？本服务保存的该账号会话状态也会被删除。")) return;
-      await api(`/api/accounts/${encodeURIComponent(accountId)}`, { method: "DELETE" });
     }
     await refreshData(false);
   } catch (error) {
@@ -589,6 +591,35 @@ function openAccountRemarkDialog(account) {
   document.querySelector("#accountRemarkInput").value = account.displayName || "";
   els.accountDialog.showModal();
   document.querySelector("#accountRemarkInput").select();
+}
+
+function openRemoveAccountDialog(account) {
+  document.querySelector("#removingAccountId").value = account.accountId;
+  document.querySelector("#removingAccountName").textContent = accountDisplayName(account.accountId);
+  document.querySelector('input[name="retainHistory"][value="true"]').checked = true;
+  els.removeAccountDialog.showModal();
+  drawIcons();
+}
+
+async function removeAccount(event) {
+  event.preventDefault();
+  const button = event.submitter;
+  const accountId = document.querySelector("#removingAccountId").value;
+  const retainHistory = document.querySelector('input[name="retainHistory"]:checked')?.value === "true";
+  try {
+    button.disabled = true;
+    await api(`/api/accounts/${encodeURIComponent(accountId)}`, {
+      method: "DELETE",
+      body: { retainHistory }
+    });
+    els.removeAccountDialog.close();
+    await refreshData(false);
+    toast(retainHistory ? "账号已移除，重新扫码后将恢复会话历史" : "账号和会话历史已删除");
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function saveAccountRemark(event) {

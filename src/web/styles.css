@@ -291,6 +291,24 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 .modal-header h2 { font-size: 18px; }
 .modal-body { padding: 22px 20px; }
 .modal-footer { min-height: 70px; padding: 14px 20px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: end; gap: 10px; }
+.account-removal-body { display: grid; gap: 16px; }
+.account-removal-lead { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
+.account-removal-lead strong { color: var(--ink); }
+.account-removal-choices { display: grid; gap: 9px; }
+.account-removal-choice { position: relative; cursor: pointer; }
+.account-removal-choice > input { position: absolute; width: 1px; min-height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.account-removal-option { min-height: 76px; padding: 13px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--canvas); display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 12px; transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease; }
+.account-removal-option-icon { width: 36px; height: 36px; border-radius: var(--radius); color: var(--green-dark); background: var(--green-soft); display: grid; place-items: center; }
+.account-removal-option-icon svg { width: 18px; height: 18px; }
+.account-removal-option strong, .account-removal-option small { display: block; }
+.account-removal-option strong { margin-bottom: 4px; font-size: 13px; }
+.account-removal-option small { color: var(--ink-soft); font-size: 10px; line-height: 1.55; }
+.account-removal-choice > input:checked + .account-removal-option { border-color: var(--green); background: #f4faf6; box-shadow: 0 0 0 2px rgb(18 161 80 / 10%); }
+.account-removal-choice > input:focus-visible + .account-removal-option { outline: 3px solid color-mix(in srgb, var(--focus) 18%, transparent); }
+.account-removal-choice.is-destructive .account-removal-option-icon { color: var(--red); background: var(--red-soft); }
+.account-removal-choice.is-destructive > input:checked + .account-removal-option { border-color: #d6908d; background: #fff7f6; box-shadow: 0 0 0 2px rgb(200 64 61 / 9%); }
+.account-removal-note { margin: 0; padding-top: 2px; color: var(--ink-soft); font-size: 10px; line-height: 1.5; display: flex; align-items: center; gap: 7px; }
+.account-removal-note svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--green-dark); }
 .update-modal { width: min(calc(100% - 32px), 520px); }
 .update-modal-header { background: #f8faf8; }
 .update-modal-icon { width: 42px; height: 42px; flex: 0 0 42px; border-radius: var(--radius); color: var(--green-dark); background: var(--green-soft); display: grid; place-items: center; }

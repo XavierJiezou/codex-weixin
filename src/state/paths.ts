@@ -10,6 +10,7 @@ export function defaultStateDir(): string {
 export type StatePaths = {
   root: string;
   accountsDir: string;
+  retainedAccountsPath: string;
   configPath: string;
   statePath: string;
   inboundDir: string;
@@ -21,6 +22,7 @@ export function resolveStatePaths(root = defaultStateDir()): StatePaths {
   return {
     root,
     accountsDir: path.join(root, "accounts"),
+    retainedAccountsPath: path.join(root, "retained-accounts.json"),
     configPath: path.join(root, "config.json"),
     statePath: path.join(root, "state.json"),
     inboundDir: path.join(root, "inbound"),

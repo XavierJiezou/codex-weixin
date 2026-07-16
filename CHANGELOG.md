@@ -2,6 +2,17 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.3] - 2026-07-16
+
+### Added
+
+- Added an account-removal dialog that lets users retain session history or delete it permanently, with retention selected by default.
+- Added credential-free retained-account matching so the same WeChat user can scan again and recover the previous local remark, authorization, active-session state, and managed sessions.
+
+### Security
+
+- Removed account login credentials immediately in both deletion modes. The retained recovery index stores only the local account ID, stable WeChat user ID, optional remark, and retention timestamp; it never stores tokens or service endpoints.
+
 ## [0.3.2] - 2026-07-16
 
 ### Fixed
@@ -154,6 +165,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.3]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.3
 [0.3.2]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.2
 [0.3.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.1
 [0.3.0]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.0

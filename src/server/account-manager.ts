@@ -14,9 +14,11 @@ import { accountStatePaths, type StatePaths } from "../state/paths.js";
 import { RuntimeStateStore, type ManagedSession, type SessionRuntimeOverrides } from "../state/runtime-state.js";
 import {
   deleteAccount,
+  forgetRetainedAccount,
   listAccounts,
   loadAccount,
   publicAccount,
+  retainAccountHistory,
   setAccountDisplayName,
   setAccountEnabled,
   type PublicWeixinAccount,
@@ -209,14 +211,21 @@ export class AccountManager {
     return this.summary(account);
   }
 
-  async removeAccount(accountId: string): Promise<void> {
-    await this.stopAccount(accountId, false);
+  async removeAccount(accountId: string, options: { retainHistory?: boolean } = {}): Promise<void> {
     const account = loadAccount(this.options.paths, accountId);
+    await this.stopAccount(accountId, false);
+    if (options.retainHistory) {
+      retainAccountHistory(this.options.paths, account);
+    } else if (account.userId) {
+      forgetRetainedAccount(this.options.paths, { accountId: account.accountId, userId: account.userId });
+    }
     deleteAccount(this.options.paths, accountId);
-    fs.rmSync(path.dirname(accountStatePaths(this.options.paths, account.accountId).statePath), {
-      recursive: true,
-      force: true
-    });
+    if (!options.retainHistory) {
+      fs.rmSync(path.dirname(accountStatePaths(this.options.paths, account.accountId).statePath), {
+        recursive: true,
+        force: true
+      });
+    }
     this.entries.delete(account.accountId);
   }
 

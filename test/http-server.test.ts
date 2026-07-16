@@ -20,6 +20,44 @@ test("Codex status probe reuses the runner command resolver", async () => {
   });
 });
 
+test("account deletion passes the session-history retention choice", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-delete-api-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const calls: Array<{ accountId: string; retainHistory?: boolean }> = [];
+  const server = await startLocalHttpServer({
+    paths: resolveStatePaths(root),
+    accountManager: {
+      async removeAccount(accountId: string, options: { retainHistory?: boolean }) {
+        calls.push({ accountId, retainHistory: options.retainHistory });
+      }
+    } as never,
+    port: 0
+  });
+  t.after(() => server.close());
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Codex-Weixin-Token": server.requestToken,
+    Origin: server.url
+  };
+
+  const retained = await fetch(`${server.url}/api/accounts/account-one`, {
+    method: "DELETE",
+    headers,
+    body: JSON.stringify({ retainHistory: true })
+  });
+  assert.equal(retained.status, 200);
+
+  const deleted = await fetch(`${server.url}/api/accounts/account-two`, {
+    method: "DELETE",
+    headers
+  });
+  assert.equal(deleted.status, 200);
+  assert.deepEqual(calls, [
+    { accountId: "account-one", retainHistory: true },
+    { accountId: "account-two", retainHistory: false }
+  ]);
+});
+
 test("local API redacts credentials and protects mutations", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-http-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -98,6 +136,8 @@ test("local API redacts credentials and protects mutations", async (t) => {
     /href="https:\/\/github\.com\/XavierJiezou\/codex-weixin" target="_blank" rel="noopener noreferrer"/
   );
   assert.match(pageHtml, /id="updateCheckButton"/);
+  assert.match(pageHtml, /id="removeAccountDialog"/);
+  assert.match(pageHtml, /重新扫码后恢复/);
   const faviconResponse = await fetch(`${server.url}/favicon.svg`);
   assert.equal(faviconResponse.status, 200);
   assert.match(faviconResponse.headers.get("content-type") ?? "", /^image\/svg\+xml/);

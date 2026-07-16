@@ -20,6 +20,9 @@ const bodySchema = z.record(z.string(), z.unknown());
 const accountDisplayNameSchema = z.object({
   displayName: z.string().max(40)
 });
+const accountDeleteSchema = z.object({
+  retainHistory: z.boolean().optional()
+});
 const sessionPatchSchema = z.object({
   title: z.string().max(80).optional(),
   model: z.string().max(200).nullable().optional(),
@@ -209,7 +212,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse,
     return;
   }
   if (method === "DELETE" && accountMatch) {
-    await context.accountManager.removeAccount(accountMatch.accountId);
+    const body = accountDeleteSchema.parse(await readJsonBody(request));
+    await context.accountManager.removeAccount(accountMatch.accountId, {
+      retainHistory: body.retainHistory === true
+    });
     sendJson(response, 200, { ok: true });
     return;
   }
