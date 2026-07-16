@@ -9,6 +9,7 @@ import {
   aesEcbPaddedSize,
   decryptAesEcb,
   encryptAesEcb,
+  InboundMediaTooLargeError,
   parseAesKey,
   sanitizeFileName,
   downloadInboundAttachments,
@@ -222,4 +223,67 @@ test("downloads inbound encrypted voice attachments to audio files", async (t) =
   assert.equal(attachments[0].label, "voice.silk");
   assert.equal(path.extname(attachments[0].path), ".silk");
   assert.deepEqual(fs.readFileSync(attachments[0].path), plaintext);
+});
+
+test("allows AES padding at the inbound size boundary", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-boundary-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const key = crypto.randomBytes(16);
+  const plaintext = Buffer.alloc(16, 1);
+  const ciphertext = encryptAesEcb(plaintext, key);
+
+  const attachments = await downloadInboundAttachments({
+    rootDir: tmpDir,
+    senderId: "alice@im.wechat",
+    messageId: "boundary-1",
+    attachments: [{
+      kind: "file",
+      label: "boundary.bin",
+      item: {
+        type: 4,
+        file_item: {
+          media: {
+            full_url: "https://example.test/boundary",
+            aes_key: key.toString("base64")
+          }
+        }
+      }
+    }],
+    maxBytes: plaintext.length,
+    fetch: async () => new Response(new Uint8Array(ciphertext), {
+      status: 200,
+      headers: { "content-length": String(ciphertext.length) }
+    })
+  });
+
+  assert.deepEqual(fs.readFileSync(attachments[0].path), plaintext);
+});
+
+test("rejects inbound media beyond the configured plain size", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-oversize-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+
+  await assert.rejects(downloadInboundAttachments({
+    rootDir: tmpDir,
+    senderId: "alice@im.wechat",
+    messageId: "oversize-1",
+    attachments: [{
+      kind: "video",
+      label: "video.mp4",
+      item: {
+        type: 5,
+        video_item: { media: { full_url: "https://example.test/video" } }
+      }
+    }],
+    maxBytes: 100,
+    fetch: async () => new Response(null, {
+      status: 200,
+      headers: { "content-length": "101" }
+    })
+  }), (error) => {
+    assert.ok(error instanceof InboundMediaTooLargeError);
+    assert.equal(error.maxBytes, 100);
+    assert.equal(error.actualBytes, 101);
+    return true;
+  });
 });

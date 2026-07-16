@@ -75,6 +75,18 @@ export type DownloadedInboundAttachment = {
   label: string;
 };
 
+export class InboundMediaTooLargeError extends Error {
+  readonly maxBytes: number;
+  readonly actualBytes?: number;
+
+  constructor(maxBytes: number, actualBytes?: number) {
+    super(`Inbound media exceeds max size ${maxBytes} bytes`);
+    this.name = "InboundMediaTooLargeError";
+    this.maxBytes = maxBytes;
+    this.actualBytes = actualBytes;
+  }
+}
+
 export async function downloadInboundAttachments(input: {
   rootDir: string;
   senderId: string;
@@ -106,13 +118,17 @@ async function downloadInboundAttachment(input: {
   fetch?: FetchLike;
 }): Promise<DownloadedInboundAttachment> {
   const ref = inboundMediaRef(input.attachment);
+  const key = inboundAesKey(ref);
   const encrypted = await downloadMediaBuffer({
     url: ref.fullUrl ?? downloadUrlFromParam(ref.encryptQueryParam),
-    maxBytes: input.maxBytes,
+    maxBytes: key ? aesEcbPaddedSize(input.maxBytes) : input.maxBytes,
+    plainMaxBytes: input.maxBytes,
     fetch: input.fetch
   });
-  const key = inboundAesKey(ref);
   const plaintext = key ? decryptAesEcb(encrypted, key) : encrypted;
+  if (plaintext.length > input.maxBytes) {
+    throw new InboundMediaTooLargeError(input.maxBytes, plaintext.length);
+  }
   const label = labelWithExtension(input.attachment.label, input.attachment.kind, plaintext);
   const targetPath = uniqueInboundPath({
     rootDir: input.rootDir,
@@ -158,6 +174,7 @@ function inboundAesKey(ref: { aeskey?: string; aesKey?: string }): Buffer | unde
 async function downloadMediaBuffer(input: {
   url: string;
   maxBytes: number;
+  plainMaxBytes: number;
   fetch?: FetchLike;
 }): Promise<Buffer> {
   const response = await (input.fetch ?? globalThis.fetch.bind(globalThis))(input.url);
@@ -166,11 +183,11 @@ async function downloadMediaBuffer(input: {
   }
   const contentLength = response.headers.get("content-length");
   if (contentLength && Number(contentLength) > input.maxBytes) {
-    throw new Error(`Inbound media exceeds max size ${input.maxBytes} bytes`);
+    throw new InboundMediaTooLargeError(input.plainMaxBytes, Number(contentLength));
   }
   const buffer = Buffer.from(await response.arrayBuffer());
   if (buffer.length > input.maxBytes) {
-    throw new Error(`Inbound media exceeds max size ${input.maxBytes} bytes`);
+    throw new InboundMediaTooLargeError(input.plainMaxBytes, buffer.length);
   }
   return buffer;
 }

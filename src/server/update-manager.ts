@@ -204,6 +204,7 @@ export function buildNpmInstallCommand(
     platform?: NodeJS.Platform;
     env?: NodeJS.ProcessEnv;
     nodePath?: string;
+    npmPath?: string;
   }
 ): { command: string; args: string[] } {
   const safeVersion = requireStableVersion(version);
@@ -224,17 +225,56 @@ export function buildNpmInstallCommand(
     "--no-audit",
     "--no-fund"
   ];
-  const npmExecPath = env.npm_execpath;
+  const npmExecPath = options.npmPath
+    ?? (env.npm_execpath && /\.(?:c?js|mjs)$/i.test(env.npm_execpath) ? env.npm_execpath : undefined);
   if (npmExecPath && /\.(?:c?js|mjs)$/i.test(npmExecPath)) {
     return { command: nodePath, args: [npmExecPath, ...installArgs] };
   }
   if (platform === "win32") {
     return {
       command: env.ComSpec || "cmd.exe",
-      args: ["/d", "/s", "/c", "npm", ...installArgs]
+      args: ["/d", "/s", "/c", npmExecPath || "npm", ...installArgs]
     };
   }
-  return { command: "npm", args: installArgs };
+  return { command: npmExecPath || "npm", args: installArgs };
+}
+
+export function resolveNpmPath(options: {
+  installPrefix: string;
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+  nodePath?: string;
+}): string | undefined {
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  const pathApi = platform === "win32" ? path.win32 : path.posix;
+  const nodePath = options.nodePath ?? process.execPath;
+  const installPrefix = requireInstallPrefix(options.installPrefix, platform);
+  const nodeRoot = pathApi.dirname(pathApi.dirname(nodePath));
+  const executableNames = platform === "win32" ? ["npm.cmd", "npm.exe"] : ["npm"];
+  const candidates = [
+    env.npm_execpath,
+    pathApi.join(nodeRoot, "libexec", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    pathApi.join(nodeRoot, "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    pathApi.join(installPrefix, "libexec", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    pathApi.join(installPrefix, "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    ...executableNames.map((name) => pathApi.join(pathApi.dirname(nodePath), name)),
+    ...executableNames.map((name) => pathApi.join(installPrefix, platform === "win32" ? "" : "bin", name)),
+    ...(platform === "darwin" ? ["/opt/homebrew/bin/npm", "/usr/local/bin/npm"] : []),
+    ...(env.PATH ?? "").split(pathApi.delimiter).filter(Boolean).flatMap((directory) =>
+      executableNames.map((name) => pathApi.join(directory, name))
+    )
+  ];
+  for (const candidate of candidates) {
+    if (!candidate || !pathApi.isAbsolute(candidate) || !fs.existsSync(candidate)) continue;
+    try {
+      const resolved = fs.realpathSync.native(candidate);
+      if (fs.statSync(resolved).isFile()) return resolved;
+    } catch {
+      // Try the next candidate when a symlink is broken or inaccessible.
+    }
+  }
+  return undefined;
 }
 
 export function resolveNpmInstallPrefix(
@@ -322,12 +362,19 @@ async function installCurrentRuntimeVersion(
     packageRoot: target.packageRoot,
     platform: options.platform
   });
+  const npmPath = resolveNpmPath({
+    installPrefix: target.installPrefix,
+    platform: options.platform,
+    env: options.env,
+    nodePath: options.nodePath
+  });
   const command = buildNpmInstallCommand(version, registry, {
     installPrefix: target.installPrefix,
     global: target.global,
     platform: options.platform,
     env: options.env,
-    nodePath: options.nodePath
+    nodePath: options.nodePath,
+    npmPath
   });
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command.command, command.args, {

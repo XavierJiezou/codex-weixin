@@ -22,7 +22,7 @@ const state = {
 };
 
 const MAX_CHAT_FILES = 10;
-const MAX_CHAT_FILE_BYTES = 50 * 1024 * 1024;
+const MAX_CHAT_FILE_BYTES = 100 * 1024 * 1024;
 const DISMISSED_UPDATE_KEY = "codex-weixin.dismissed-update";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const UPDATE_RECONNECT_TIMEOUT_MS = 90 * 1000;
@@ -1085,7 +1085,7 @@ function handleChatFileSelection(event) {
   }
   const totalBytes = combined.reduce((total, file) => total + file.size, 0);
   if (totalBytes > MAX_CHAT_FILE_BYTES) {
-    toast("附件总大小不能超过 50 MB", true);
+    toast("单次附件总大小不能超过 100 MiB", true);
     return;
   }
   state.chatFiles = combined;

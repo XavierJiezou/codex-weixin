@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -9,6 +12,7 @@ import {
   releaseRuntimeDirectoryLock,
   resolveNpmInstallPrefix,
   resolveNpmInstallTarget,
+  resolveNpmPath,
   UpdateManager
 } from "../src/server/update-manager.js";
 
@@ -164,6 +168,17 @@ test("builds fixed cross-platform npm install commands", () => {
     args: ["install", "--prefix", "/Users/tester/codex-weixin-runtime", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
   });
   assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
+    installPrefix: "/opt/homebrew",
+    global: true,
+    platform: "darwin",
+    env: { PATH: "/usr/bin:/bin" },
+    nodePath: "/opt/homebrew/bin/node",
+    npmPath: "/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js"
+  }), {
+    command: "/opt/homebrew/bin/node",
+    args: ["/opt/homebrew/lib/node_modules/npm/bin/npm-cli.js", "install", "--global", "--prefix", "/opt/homebrew", "--no-save", "--package-lock=false", "codex-weixin@1.2.4", "--registry=https://registry.npmjs.org", "--no-audit", "--no-fund"]
+  });
+  assert.deepEqual(buildNpmInstallCommand("1.2.4", "official", {
     installPrefix: "C:\\Users\\THU\\codex-weixin-runtime",
     global: true,
     platform: "win32",
@@ -195,6 +210,60 @@ test("builds fixed cross-platform npm install commands", () => {
     () => buildNpmInstallCommand("1.2.4", "official", { installPrefix: "relative/runtime" }),
     /Invalid npm install prefix/
   );
+});
+
+test("finds Homebrew npm-cli outside a background service PATH", (t) => {
+  const prefix = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-npm-path-"));
+  t.after(() => fs.rmSync(prefix, { recursive: true, force: true }));
+  const nodeRoot = path.join(prefix, "Cellar", "node", "1.0.0");
+  const nodePath = path.join(nodeRoot, "bin", "node");
+  const npmPath = path.join(nodeRoot, "libexec", "lib", "node_modules", "npm", "bin", "npm-cli.js");
+  fs.mkdirSync(path.dirname(nodePath), { recursive: true });
+  fs.mkdirSync(path.dirname(npmPath), { recursive: true });
+  fs.writeFileSync(nodePath, "node");
+  fs.writeFileSync(npmPath, "npm");
+
+  assert.equal(resolveNpmPath({
+    installPrefix: prefix,
+    platform: "darwin",
+    env: { PATH: "/usr/bin:/bin" },
+    nodePath
+  }), fs.realpathSync.native(npmPath));
+});
+
+test("installs through an absolute npm CLI when PATH has no npm", async (t) => {
+  const prefix = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-npm-install-"));
+  t.after(() => fs.rmSync(prefix, { recursive: true, force: true }));
+  const packageRoot = path.join(prefix, "node_modules", "codex-weixin");
+  const entryPath = path.join(packageRoot, "dist", "server", "index.js");
+  const npmCliPath = path.join(prefix, "fake-npm-cli.mjs");
+  fs.mkdirSync(path.dirname(entryPath), { recursive: true });
+  fs.writeFileSync(path.join(packageRoot, "package.json"), JSON.stringify({ version: "1.2.3" }));
+  fs.writeFileSync(entryPath, "export {};\n");
+  fs.writeFileSync(npmCliPath, [
+    'import fs from "node:fs";',
+    'import path from "node:path";',
+    'const args = process.argv.slice(2);',
+    'const prefix = args[args.indexOf("--prefix") + 1];',
+    'const spec = args.find((arg) => arg.startsWith("codex-weixin@"));',
+    'const version = spec.slice("codex-weixin@".length);',
+    'const root = path.join(prefix, "node_modules", "codex-weixin");',
+    'fs.mkdirSync(path.join(root, "dist", "server"), { recursive: true });',
+    'fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ version }));',
+    'fs.writeFileSync(path.join(root, "dist", "server", "index.js"), "export {};\\n");'
+  ].join("\n"));
+
+  const manager = new UpdateManager({
+    currentVersion: "1.2.3",
+    packageRoot,
+    platform: "darwin",
+    env: { PATH: "/usr/bin:/bin", npm_execpath: npmCliPath },
+    nodePath: process.execPath,
+    fetch: async () => new Response(JSON.stringify({ version: "1.2.4" }), { status: 200 })
+  });
+
+  assert.deepEqual(await manager.installLatest(), { version: "1.2.4", registry: "official" });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8")).version, "1.2.4");
 });
 
 test("resolves global and isolated npm install targets on macOS and Windows", () => {

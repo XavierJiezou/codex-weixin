@@ -2,6 +2,19 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.4] - 2026-07-16
+
+### Changed
+
+- Raised the shared inbound attachment limit from 50 MiB to 100 MiB, matching Tencent's official connector: Web turns accept up to 10 files totaling 100 MiB, while each WeChat attachment may be up to 100 MiB.
+- Migrated the previous 50 MiB default automatically and clamped manually configured values so the service never accepts attachments above 100 MiB.
+
+### Fixed
+
+- Replied directly in WeChat when an attachment exceeds 100 MiB instead of sending a download-failure marker to Codex and producing a misleading retry response.
+- Accounted for AES padding at the exact WeChat attachment boundary so a 100 MiB plaintext file is not rejected because its encrypted payload is slightly larger.
+- Fixed macOS Web updates failing with `spawn npm ENOENT` when the service is launched without Homebrew in `PATH`; the updater now locates the active Node installation's `npm-cli.js` and starts it with an absolute Node path.
+
 ## [0.3.3] - 2026-07-16
 
 ### Added
@@ -165,6 +178,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.4]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.4
 [0.3.3]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.3
 [0.3.2]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.2
 [0.3.1]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.1

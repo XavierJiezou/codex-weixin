@@ -467,17 +467,17 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(body.toString("utf8"));
 }
 
-async function readBodyBuffer(request: IncomingMessage, maxBytes: number): Promise<Buffer> {
+async function readBodyBuffer(request: IncomingMessage, maxBytes: number, limitMessage = "Request body is too large"): Promise<Buffer> {
   const contentLength = Number(request.headers["content-length"]);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-    throw new Error("Request body is too large");
+    throw new Error(limitMessage);
   }
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buffer.length;
-    if (total > maxBytes) throw new Error("Request body is too large");
+    if (total > maxBytes) throw new Error(limitMessage);
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);
@@ -494,7 +494,8 @@ async function readSessionMessageBody(
     return { text: requiredString(body.text, "text"), uploads: [] };
   }
 
-  const raw = await readBodyBuffer(request, maxUploadBytes + MULTIPART_OVERHEAD_BYTES);
+  const limitMessage = `Attachments exceed the ${formatByteLimit(maxUploadBytes)} limit`;
+  const raw = await readBodyBuffer(request, maxUploadBytes + MULTIPART_OVERHEAD_BYTES, limitMessage);
   let formData: FormData;
   try {
     formData = await new Response(new Uint8Array(raw), {
@@ -518,7 +519,7 @@ async function readSessionMessageBody(
     const data = Buffer.from(await entry.arrayBuffer());
     totalBytes += data.length;
     if (totalBytes > maxUploadBytes) {
-      throw new Error(`Attachments exceed max size ${maxUploadBytes} bytes`);
+      throw new Error(limitMessage);
     }
     uploads.push({ name: entry.name, data });
   }
@@ -526,6 +527,10 @@ async function readSessionMessageBody(
     throw new Error("Message text or attachment is required");
   }
   return { text, uploads };
+}
+
+function formatByteLimit(bytes: number): string {
+  return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MiB` : `${bytes} byte${bytes === 1 ? "" : "s"}`;
 }
 
 function requiredString(value: unknown, name: string): string {

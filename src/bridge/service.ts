@@ -9,7 +9,7 @@ import { HybridCodexRunner } from "../codex/runner.js";
 import { isWorkspaceAllowed, type CodexWeixinConfig } from "../state/config.js";
 import { RuntimeStateStore } from "../state/runtime-state.js";
 import { WeixinApiClient, isStaleContextError, type FetchLike } from "../weixin/api.js";
-import { downloadInboundAttachments, sendLocalMediaFile } from "../weixin/media.js";
+import { downloadInboundAttachments, InboundMediaTooLargeError, sendLocalMediaFile } from "../weixin/media.js";
 import type { NormalizedWeixinMessage } from "../weixin/messages.js";
 import type { PromptBufferItem } from "./prompt-buffer.js";
 
@@ -64,8 +64,10 @@ export class BridgeService {
       return;
     }
 
+    const items = await this.promptItemsFromMessageWithNotice(message);
+    if (!items) return;
+
     if (this.buffers.isActive(message.senderId)) {
-      const items = await this.promptItemsFromMessage(message);
       for (const item of items) {
         this.buffers.append(message.senderId, item);
       }
@@ -73,7 +75,7 @@ export class BridgeService {
       return;
     }
 
-    await this.runCodexTurn(message, "", await this.promptItemsFromMessage(message));
+    await this.runCodexTurn(message, "", items);
   }
 
   private async handleCommand(message: NormalizedWeixinMessage, command: { name: string; arg: string }): Promise<void> {
@@ -278,12 +280,24 @@ export class BridgeService {
         });
       }
     } catch (error) {
+      if (error instanceof InboundMediaTooLargeError) throw error;
       items.push({
         kind: "text",
         text: `[WeChat attachment download failed: ${error instanceof Error ? error.message : String(error)}]`
       });
     }
     return items;
+  }
+
+  private async promptItemsFromMessageWithNotice(message: NormalizedWeixinMessage): Promise<PromptBufferItem[] | undefined> {
+    try {
+      return await this.promptItemsFromMessage(message);
+    } catch (error) {
+      if (!(error instanceof InboundMediaTooLargeError)) throw error;
+      const maxMiB = Math.floor(error.maxBytes / (1024 * 1024));
+      await this.reply(message.senderId, `附件超过 ${maxMiB} MiB 上限，请压缩或裁剪后重新发送。`);
+      return undefined;
+    }
   }
 
   private async runCodexTurn(message: NormalizedWeixinMessage, text: string, attachments: PromptBufferItem[] = []): Promise<void> {

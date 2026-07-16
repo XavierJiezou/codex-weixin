@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { BridgeService } from "../src/bridge/service.js";
-import { defaultConfig } from "../src/state/config.js";
+import { defaultConfig, MAX_INBOUND_BYTES } from "../src/state/config.js";
 import { resolveStatePaths } from "../src/state/paths.js";
 import { RuntimeStateStore } from "../src/state/runtime-state.js";
 import { encryptAesEcb } from "../src/weixin/media.js";
@@ -317,6 +317,57 @@ test("buffers inbound image attachments and includes local paths in prompt done"
   assert.ok(savedPath);
   assert.deepEqual(fs.readFileSync(savedPath), plaintext);
   assert.equal(textReplies.filter((reply) => reply === "Buffered. Send /prompt done when ready.").length, 2);
+});
+
+test("replies directly when a WeChat attachment exceeds 100 MiB", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-oversize-notice-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const replies: string[] = [];
+  let runnerCalled = false;
+  const service = new BridgeService({
+    config: {
+      ...defaultConfig(tmpDir),
+      allowedSenderIds: ["alice@im.wechat"]
+    },
+    stateStore,
+    mediaFetch: async () => new Response(null, {
+      status: 200,
+      headers: { "content-length": String(MAX_INBOUND_BYTES + 1) }
+    }),
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        replies.push(input.text);
+        return { messageId: "text-message" };
+      }
+    } as never,
+    runner: {
+      async run() {
+        runnerCalled = true;
+        return { raw: "", text: "不应执行" };
+      },
+      async stop() {}
+    } as never
+  });
+
+  const message = normalizeWeixinMessage({
+    message_id: "video-large",
+    from_user_id: "alice@im.wechat",
+    context_token: "ctx",
+    item_list: [{
+      type: 5,
+      video_item: {
+        media: { full_url: "https://example.test/video" },
+        video_size: MAX_INBOUND_BYTES + 1
+      }
+    }]
+  });
+  assert.ok(message);
+  await service.handleMessage(message);
+
+  assert.equal(runnerCalled, false);
+  assert.deepEqual(replies, ["附件超过 100 MiB 上限，请压缩或裁剪后重新发送。"]);
 });
 
 test("lists and switches model and reasoning effort for the active WeChat session", async (t) => {

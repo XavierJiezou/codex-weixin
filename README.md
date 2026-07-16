@@ -30,9 +30,9 @@
 | ✅ | 多微信账号 | 一个服务并行运行多个微信账号，支持本机备注、独立授权、独立附件与会话状态；移除账号时可选择保留历史。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
 | ✅ | 网页扫码接入 | 显示等待扫码、已扫码、已连接和二维码过期状态。 | 待补：`docs/images/screenshots/wechat-qr-login.png` |
 | ✅ | 会话管理 | 按微信账号分类，查看 Markdown 历史并继续同一 Codex thread；支持新建、重命名、切换、重置和删除。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
-| ✅ | Web 文本与附件 | 一次发送文本和最多 10 个文件（合计 50 MB），历史中可播放、预览或下载媒体。 | 待补：`docs/images/screenshots/web-attachments.png` |
+| ✅ | Web 文本与附件 | 一次发送文本和最多 10 个文件（合计 100 MiB），历史中可播放、预览或下载媒体。 | 待补：`docs/images/screenshots/web-attachments.png` |
 | ✅ | 微信私聊控制 | 支持普通消息和 `/status`、`/new`、`/bind`、`/model`、`/effort`、`/prompt start`、`/prompt done`、`/stop`。 | 待补：`docs/images/screenshots/wechat-chat.png` |
-| ✅ | 微信多媒体输入 | 接收语音转写、图片、音频、视频和文件，并以本机附件交给 Codex。 | 待补：`docs/images/screenshots/wechat-media-input.png` |
+| ✅ | 微信多媒体输入 | 接收语音转写、图片、音频、视频和文件；单个附件最大 100 MiB，超限时直接提示。 | 待补：`docs/images/screenshots/wechat-media-input.png` |
 | ✅ | 文件回传微信 | Codex 可把本机图片、视频和文件作为微信原生消息发回。 | 待补：`docs/images/screenshots/wechat-media-output.png` |
 | ✅ | 模型和推理强度 | 从 app-server 读取模型能力并通过下拉列表切换；IkunCoding 支持 GPT-5.6 Sol、Terra 和 Luna。 | 待补：`docs/images/screenshots/web-model-settings.png` |
 | ✅ | 过程进度 | 默认开启；Codex 处理过程实时发送到微信，并在 Web 中折叠显示处理用时，最终答案保持完整。 | 待补：`docs/images/screenshots/web-process-progress.png` |
@@ -97,7 +97,7 @@ npm start
 
 “会话”页面只管理由本服务创建和使用的 Codex 会话，不扫描或接管其他终端产生的全部 Codex 历史记录。
 
-选择一个会话后，右侧会从 Codex 自身保存的 thread 中读取历史用户消息和最终回复。聊天标题下方可以为当前会话选择模型、推理强度和过程进度，或继续继承全局设置；这与微信 `/model`、`/effort`、`/stream` 共用同一份会话配置。过程进度默认开启，在 Web 中折叠展示并记录处理用时，最终答案仍作为一个完整回复显示。可以直接在页面底部继续聊天，并通过回形针按钮将文本提示词和多个文件作为同一个 turn 发送；Web 和微信共用同一个 thread，上下文会保持连续。上传文件按微信账号和会话隔离保存在 `~/.codex-weixin/inbound/`，每次最多 10 个、合计不超过 50 MB。
+选择一个会话后，右侧会从 Codex 自身保存的 thread 中读取历史用户消息和最终回复。聊天标题下方可以为当前会话选择模型、推理强度和过程进度，或继续继承全局设置；这与微信 `/model`、`/effort`、`/stream` 共用同一份会话配置。过程进度默认开启，在 Web 中折叠展示并记录处理用时，最终答案仍作为一个完整回复显示。可以直接在页面底部继续聊天，并通过回形针按钮将文本提示词和多个文件作为同一个 turn 发送；Web 和微信共用同一个 thread，上下文会保持连续。上传文件按微信账号和会话隔离保存在 `~/.codex-weixin/inbound/`，每次最多 10 个、合计不超过 100 MiB。
 
 页面默认使用账号备注，不把内部 ID 当作账号名称。展开账号卡片中的“账号 ID”可以查看 iLink Bot ID 和 User ID；Codex thread id 仍不在普通页面显示。可以在“微信账号”页面给账号设置只保存在本机的备注；备注会同步用于会话标签。未设置备注时才使用“微信账号 1”这类默认名称。当前扫码和消息接口没有提供微信昵称、头像或个人资料查询能力，因此页面使用默认图标。
 

@@ -357,7 +357,10 @@ test("session message API accepts text and file uploads together", async (t) => 
     body: oversized
   });
   assert.equal(oversizedResponse.status, 400);
-  assert.match((await oversizedResponse.json() as { error: string }).error, /exceed/i);
+  assert.equal(
+    (await oversizedResponse.json() as { error: string }).error,
+    "Attachments exceed the 8 bytes limit"
+  );
   assert.equal(calls.length, 1);
 });
 
