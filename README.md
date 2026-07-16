@@ -222,6 +222,6 @@ npm run build
 
 版本变更见 [CHANGELOG.md](./CHANGELOG.md)。
 
-## Community
+## 社区
 
 感谢 [LINUX DO](https://linux.do/) 社区佬友的支持与反馈。
