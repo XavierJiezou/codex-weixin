@@ -256,4 +256,4 @@ npm run build
 
 ## 社区
 
-感谢 [LINUX DO](https://linux.do/) 社区佬友的支持与反馈。
+感谢 [LINUX DO](https://linux.do/t/topic/2599273) 社区佬友的支持与反馈。
