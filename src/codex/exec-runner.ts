@@ -75,7 +75,8 @@ export class CodexExecRunner {
       const child = spawn(codexCommand.command, [...codexCommand.argsPrefix, ...args], {
         cwd: input.cwd,
         stdio: ["ignore", "pipe", "pipe"],
-        shell: false
+        shell: false,
+        windowsHide: true
       });
       const activeRun = { child, threadId: input.threadId };
       this.activeRuns.push(activeRun);

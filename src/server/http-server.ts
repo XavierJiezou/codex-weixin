@@ -689,7 +689,10 @@ function mediaContentType(fileName: string): string {
 export async function checkCodex(codexBin: string): Promise<{ ready: boolean; version?: string; error?: string }> {
   try {
     const command = resolveCodexCommand(codexBin);
-    const result = await execFileAsync(command.command, [...command.argsPrefix, "--version"], { timeout: 5_000 });
+    const result = await execFileAsync(command.command, [...command.argsPrefix, "--version"], {
+      timeout: 5_000,
+      windowsHide: true
+    });
     return { ready: true, version: result.stdout.trim() || result.stderr.trim() || codexBin };
   } catch (error) {
     return { ready: false, error: error instanceof Error ? error.message : String(error) };

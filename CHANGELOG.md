@@ -2,6 +2,12 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.5] - 2026-07-17
+
+### Fixed
+
+- Prevented visible Node.js console windows from repeatedly appearing on Windows when the Web UI checks the Codex CLI, starts the Codex app-server, or falls back to `codex exec`.
+
 ## [0.3.4] - 2026-07-16
 
 ### Changed

@@ -261,7 +261,8 @@ export class AppServerCodexRunner {
     const command = resolveCodexCommand(this.options.codexBin ?? "codex");
     const child = spawn(command.command, [...command.argsPrefix, "app-server", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
-      shell: false
+      shell: false,
+      windowsHide: true
     });
     this.child = child;
     this.stderr = "";
