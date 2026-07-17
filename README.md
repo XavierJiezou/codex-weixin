@@ -20,30 +20,62 @@
 
 它不是通用消息网关，不接入其他聊天平台，也不把管理页面开放到局域网或公网。
 
-## 功能状态
+## 核心功能
 
-截图统一放在 `docs/images/screenshots/`。Web 管理页截图已补齐；需要手机微信画面的功能保留了固定文件名，后续可直接补图。
+### 1. 微信多媒体输入与文件回传
 
-| 状态 | 功能 | 说明 | 截图 |
-| --- | --- | --- | --- |
-| ✅ | 本机 Web 管理 | 页面只监听 `127.0.0.1`，集中管理微信账号、会话、工作目录和 Codex 设置。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
-| ✅ | 多微信账号 | 一个服务并行运行多个微信账号，支持本机备注、独立授权、独立附件与会话状态；移除账号时可选择保留历史。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
-| ✅ | 网页扫码接入 | 显示等待扫码、已扫码、已连接和二维码过期状态。 | 待补：`docs/images/screenshots/wechat-qr-login.png` |
-| ✅ | 会话管理 | 按微信账号分类，查看 Markdown 历史并继续同一 Codex thread；支持新建、重命名、切换、重置和删除。 | [Web 会话管理](docs/images/screenshots/web-session-management.png) |
-| ✅ | Web 文本与附件 | 一次发送文本和最多 10 个文件（合计 100 MiB），历史中可播放、预览或下载媒体。 | 待补：`docs/images/screenshots/web-attachments.png` |
-| ✅ | 微信私聊控制 | 支持普通消息和 `/status`、`/new`、`/bind`、`/model`、`/effort`、`/prompt start`、`/prompt done`、`/stop`。 | 待补：`docs/images/screenshots/wechat-chat.png` |
-| ✅ | 微信多媒体输入 | 接收语音转写、图片、音频、视频和文件；单个附件最大 100 MiB，超限时直接提示。 | 待补：`docs/images/screenshots/wechat-media-input.png` |
-| ✅ | 文件回传微信 | Codex 可把本机图片、视频和文件作为微信原生消息发回。 | 待补：`docs/images/screenshots/wechat-media-output.png` |
-| ✅ | 模型和推理强度 | 从 app-server 读取模型能力并通过下拉列表切换；IkunCoding 支持 GPT-5.6 Sol、Terra 和 Luna。 | 待补：`docs/images/screenshots/web-model-settings.png` |
-| ✅ | 过程进度 | 默认开启；Codex 处理过程实时发送到微信，并在 Web 中折叠显示处理用时，最终答案保持完整。 | 待补：`docs/images/screenshots/web-process-progress.png` |
-| ✅ | 输入状态与去重 | Web 显示“对方正在输入…”，并持久记录同步游标和消息 ID，防止重复回复。 | 待补：`docs/images/screenshots/wechat-typing.png` |
-| ✅ | App-server 优先 | 新旧会话优先使用 Codex app-server V2；不可用时自动回退到 `codex exec`。 | 待补：`docs/images/screenshots/wechat-status.png` |
-| ✅ | Web 自动更新 | 自动选择 npm 官方源或 npmmirror，更新当前实际运行的 npm runtime，校验后重启并恢复连接。 | 待补：`docs/images/screenshots/web-auto-update.png` |
-
-## Web 管理页预览
+微信端可以发送文本、图片、音频、视频和文档给 Codex，单个附件最大 100 MiB。Codex 也可以把本机图片、视频和文件作为微信原生消息发回。
 
 <p align="center">
-  <img src="docs/images/screenshots/web-session-management.png" alt="codex-weixin Web 会话管理页面" width="100%" />
+  <img src="docs/images/screenshots/wechat-media-input-output.png" alt="通过微信向 Codex 发送文件并接收回传" width="420" />
+</p>
+
+### 2. 微信原生语音指令
+
+支持微信语音转写，可以直接用语音向 Codex 下达任务；没有转写文本的语音会作为本机附件交给 Codex 处理。
+
+<p align="center">
+  <img src="docs/images/screenshots/wechat-voice-command.png" alt="通过微信语音向 Codex 下达指令" width="420" />
+</p>
+
+### 3. Codex CLI 原生命令
+
+微信端支持 `/status`、`/new`、`/bind`、`/model`、`/effort`、`/stream`、`/prompt start`、`/prompt done` 和 `/stop`，可以管理会话、工作目录、模型、推理强度和过程进度。
+
+<p align="center">
+  <img src="docs/images/screenshots/wechat-cli-commands.png" alt="在微信中使用 Codex CLI 原生命令" width="420" />
+</p>
+
+### 4. 过程进度反馈
+
+过程进度默认开启。Codex 处理长任务时会持续向微信发送中间进度，Web 端则折叠显示处理过程和用时，最终答案保持完整。
+
+<p align="center">
+  <img src="docs/images/screenshots/wechat-process-progress.png" alt="Codex 长任务的微信过程进度反馈" width="420" />
+</p>
+
+### 5. 多微信账号接入与管理
+
+一个服务可以并行运行多个微信账号。每个账号拥有独立的联系人授权、附件、会话和运行状态；移除账号时还可以选择保留历史，重新扫码后继续使用。
+
+<p align="center">
+  <img src="docs/images/screenshots/web-multi-account.png" alt="codex-weixin 多微信账号管理" width="100%" />
+</p>
+
+### 6. Web 会话管理
+
+Web 端可以按微信账号查看 Markdown 历史、继续同一个 Codex thread，并支持新建、重命名、切换、重置和删除会话。页面也支持直接发送文本和附件，每次最多 10 个文件、合计 100 MiB。
+
+<p align="center">
+  <img src="docs/images/screenshots/web-session-management.png" alt="codex-weixin Web 会话管理" width="100%" />
+</p>
+
+### 7. Web 全局设置与自动更新
+
+Web 端可以配置工作目录、Codex 后端、模型、推理强度和过程进度，也可以检查并安装新版本。全局 npm 安装会更新当前实际运行的 runtime，完成校验后自动重启并恢复连接。
+
+<p align="center">
+  <img src="docs/images/screenshots/web-global-settings.png" alt="codex-weixin Web 全局设置" width="100%" />
 </p>
 
 ## 环境要求
