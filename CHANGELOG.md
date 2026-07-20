@@ -2,6 +2,17 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.6] - 2026-07-20
+
+### Added
+
+- Added `/resume` in WeChat to list the current sender's managed sessions and switch back to a selected Codex thread by number.
+- Added recent user-prompt summaries and timestamps to the session list so users can identify historical conversations before switching, including lazy recovery for sessions created by older versions.
+
+### Security
+
+- Kept Codex thread IDs and local attachment paths out of `/resume` replies while preserving attachment names in useful session summaries.
+
 ## [0.3.5] - 2026-07-17
 
 ### Fixed
@@ -184,6 +195,8 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.6]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.6
+[0.3.5]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.5
 [0.3.4]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.4
 [0.3.3]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.3
 [0.3.2]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.2

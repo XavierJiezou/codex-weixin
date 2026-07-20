@@ -31,7 +31,7 @@ Screenshots live under `docs/images/screenshots/`. The Web management screenshot
 | ✅ | Browser QR connection | Shows waiting, scanned, connected, and expired QR states. | Pending: `docs/images/screenshots/wechat-qr-login.png` |
 | ✅ | Session management | Grouped account tabs, Markdown history, continued Codex threads, and create, rename, activate, reset, and delete actions. | [Web sessions](docs/images/screenshots/web-session-management.png) |
 | ✅ | Web text and attachments | Send text with up to 10 files (100 MiB total), with media playback, preview, and download in history. | Pending: `docs/images/screenshots/web-attachments.png` |
-| ✅ | WeChat private-chat control | Supports regular messages plus `/status`, `/new`, `/bind`, `/model`, `/effort`, `/prompt start`, `/prompt done`, and `/stop`. | Pending: `docs/images/screenshots/wechat-chat.png` |
+| ✅ | WeChat private-chat control | Supports regular messages plus `/status`, `/new`, `/resume`, `/bind`, `/model`, `/effort`, `/prompt start`, `/prompt done`, and `/stop`. | Pending: `docs/images/screenshots/wechat-chat.png` |
 | ✅ | WeChat media input | Accepts transcribed voice, images, audio, video, and files up to 100 MiB each, with a direct notice when the limit is exceeded. | Pending: `docs/images/screenshots/wechat-media-input.png` |
 | ✅ | File delivery to WeChat | Codex can return local images, videos, and files as native WeChat messages. | Pending: `docs/images/screenshots/wechat-media-output.png` |
 | ✅ | Models and reasoning effort | Model-aware dropdowns loaded from app-server, including GPT-5.6 Sol, Terra, and Luna for IkunCoding. | Pending: `docs/images/screenshots/web-model-settings.png` |
@@ -107,6 +107,7 @@ The UI uses local remarks instead of treating internal IDs as account names. Exp
 - Reset clears the recorded thread so the next message starts fresh context.
 - Delete removes only the bridge record, not Codex's own history files.
 - `/new` creates a new managed session for the current sender.
+- `/resume` lists this sender's sessions with recent prompt summaries and timestamps; `/resume <number>` switches back to the selected Codex thread.
 
 ## WeChat commands
 
@@ -115,6 +116,8 @@ The UI uses local remarks instead of treating internal IDs as account names. Exp
 /status                       Show session, workspace, thread, backend, effective model, and reasoning effort
 /bind <absolute-path>          Bind to an allowed workspace
 /new                          Create a new managed Codex session
+/resume                       List historical sessions with recent prompt summaries
+/resume <number>              Switch to and continue a historical session
 /model                        Show the current and available models
 /model <number|model|default>  Switch this session's model or restore inheritance
 /effort                       Show reasoning efforts supported by the current model

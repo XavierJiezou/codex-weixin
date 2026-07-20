@@ -40,7 +40,7 @@
 
 ### 3. Codex CLI 原生命令
 
-微信端支持 `/status`、`/new`、`/bind`、`/model`、`/effort`、`/stream`、`/prompt start`、`/prompt done` 和 `/stop`，可以管理会话、工作目录、模型、推理强度和过程进度。
+微信端支持 `/status`、`/new`、`/resume`、`/bind`、`/model`、`/effort`、`/stream`、`/prompt start`、`/prompt done` 和 `/stop`，可以管理会话、工作目录、模型、推理强度和过程进度。
 
 <p align="center">
   <img src="docs/images/screenshots/wechat-cli-commands.png" alt="在微信中使用 Codex CLI 原生命令" width="420" />
@@ -138,6 +138,7 @@ npm start
 - “重置”清空本服务记录的 thread，下一条消息创建新上下文。
 - “删除”只删除本服务中的会话记录，不删除 Codex 自身保存的历史文件。
 - 微信中的 `/new` 会立即为当前联系人创建新的受管会话。
+- 微信中的 `/resume` 会按最近更新时间列出当前联系人的历史会话、最近内容摘要和时间；发送 `/resume <序号>` 可切换并继续原来的 Codex thread。
 
 ## 微信内命令
 
@@ -146,6 +147,8 @@ npm start
 /status                       查看当前会话、工作目录、thread、backend、实际模型和推理强度
 /bind <absolute-path>          绑定到允许列表内的工作目录
 /new                          创建新的受管 Codex 会话
+/resume                       查看历史会话、最近内容摘要和序号
+/resume <序号>                切换并继续指定的历史会话
 /model                        查看当前模型和可用模型
 /model <序号|模型 ID|default>  切换当前会话模型，或恢复继承设置
 /effort                       查看当前模型支持的推理强度

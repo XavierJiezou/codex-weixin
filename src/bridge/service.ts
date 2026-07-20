@@ -2,12 +2,12 @@ import path from "node:path";
 
 import { AccessController } from "./access.js";
 import { parseActionBlocks } from "./actions.js";
-import { buildPrompt, chunkText } from "./format.js";
+import { buildPrompt, buildPromptPreview, chunkText, parsePrompt } from "./format.js";
 import { PromptBuffer } from "./prompt-buffer.js";
 import type { CodexModelOption, CodexRuntimeInfo } from "../codex/app-server-runner.js";
 import { HybridCodexRunner } from "../codex/runner.js";
 import { isWorkspaceAllowed, type CodexWeixinConfig } from "../state/config.js";
-import { RuntimeStateStore } from "../state/runtime-state.js";
+import { RuntimeStateStore, type ManagedSession } from "../state/runtime-state.js";
 import { WeixinApiClient, isStaleContextError, type FetchLike } from "../weixin/api.js";
 import { downloadInboundAttachments, InboundMediaTooLargeError, sendLocalMediaFile } from "../weixin/media.js";
 import type { NormalizedWeixinMessage } from "../weixin/messages.js";
@@ -95,6 +95,9 @@ export class BridgeService {
         this.options.stateStore.createSession(message.senderId, this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd);
         await this.reply(message.senderId, "Created a new Codex session for the next message.");
         return;
+      case "resume":
+        await this.handleResumeCommand(message.senderId, command.arg);
+        return;
       case "model":
         await this.handleModelCommand(message.senderId, command.arg);
         return;
@@ -128,6 +131,61 @@ export class BridgeService {
     }
     this.options.stateStore.setWorkspace(senderId, workspace);
     await this.reply(senderId, `Bound to workspace:\n${workspace}`);
+  }
+
+  private async handleResumeCommand(senderId: string, arg: string): Promise<void> {
+    const sessions = this.options.stateStore.listSessions().filter((session) => session.senderId === senderId);
+    const input = arg.trim();
+    if (!input) {
+      const activeId = this.options.stateStore.getActiveSession(senderId)?.id;
+      const previews = await Promise.all(sessions.map((session) => this.sessionPromptPreview(session)));
+      const lines = ["历史会话（最近更新优先）："];
+      for (const [index, session] of sessions.entries()) {
+        lines.push(
+          `${index + 1}. ${session.id === activeId ? "【当前】" : ""}${session.title}`,
+          `   最近内容：${previews[index]}（${formatSessionTime(session.updatedAt)}）`
+        );
+      }
+      lines.push("", "发送 /resume <序号> 切换会话。");
+      for (const chunk of chunkText(lines.join("\n"))) {
+        await this.reply(senderId, chunk);
+      }
+      return;
+    }
+    if (!/^\d+$/.test(input)) {
+      await this.reply(senderId, "用法：/resume 或 /resume <序号>");
+      return;
+    }
+    const selected = sessions[Number(input) - 1];
+    if (!selected) {
+      await this.reply(senderId, "没有这个历史会话。发送 /resume 查看可用序号。");
+      return;
+    }
+    const preview = await this.sessionPromptPreview(selected);
+    this.options.stateStore.activateSession(selected.id);
+    await this.reply(senderId, [
+      `已切换到：${selected.title}`,
+      `最近内容：${preview}`,
+      selected.threadId ? "下一条消息将继续该历史会话。" : "该会话尚无历史内容，下一条消息将创建新上下文。"
+    ].join("\n"));
+  }
+
+  private async sessionPromptPreview(session: ManagedSession): Promise<string> {
+    if (session.lastPromptPreview) return session.lastPromptPreview;
+    if (!session.threadId) return "尚未开始对话";
+    try {
+      const history = await this.runner.getHistory(session.threadId);
+      const lastUserMessage = [...history].reverse().find((message) => message.role === "user");
+      if (!lastUserMessage) return "暂无内容摘要";
+      const parsed = parsePrompt(lastUserMessage.text);
+      const preview = buildPromptPreview(parsed.text, parsed.attachments);
+      if (!preview) return "暂无内容摘要";
+      this.options.stateStore.setSessionPromptPreview(session.id, preview);
+      return preview;
+    } catch (error) {
+      console.warn(`Unable to read Codex history for session ${session.id}: ${error instanceof Error ? error.message : String(error)}`);
+      return "历史摘要暂不可用";
+    }
   }
 
   private async handlePromptCommand(senderId: string, arg: string): Promise<void> {
@@ -302,6 +360,10 @@ export class BridgeService {
 
   private async runCodexTurn(message: NormalizedWeixinMessage, text: string, attachments: PromptBufferItem[] = []): Promise<void> {
     const session = this.options.stateStore.ensureActiveSession(message.senderId, this.options.config.defaultCwd);
+    const promptPreview = buildPromptPreview(text, attachments);
+    if (promptPreview) {
+      this.options.stateStore.setSessionPromptPreview(session.id, promptPreview);
+    }
     const workspace = this.options.stateStore.getWorkspace(message.senderId) ?? this.options.config.defaultCwd;
     const threadId = this.options.stateStore.getThread(message.senderId) || undefined;
     const progressEnabled = session.streamReplies ?? this.options.config.streamReplies;
@@ -473,6 +535,7 @@ function helpText(): string {
     "/status - show current binding",
     "/bind <absolute-path> - bind this chat to a workspace",
     "/new - create a new managed Codex session",
+    "/resume [number] - list or switch historical sessions",
     "/model [number|model-id|default] - view or switch this session's model",
     "/effort [number|level|default] - view or switch reasoning effort",
     "/stream [on|off|default] - view or switch streaming replies",
@@ -480,6 +543,13 @@ function helpText(): string {
     "/prompt done - submit buffered prompt",
     "/stop - interrupt the current Codex task"
   ].join("\n");
+}
+
+function formatSessionTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "时间未知";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 const fallbackEfforts = ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"];

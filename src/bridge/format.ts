@@ -37,6 +37,26 @@ export type PromptAttachment = {
   path: string;
 };
 
+type PromptPreviewItem =
+  | Pick<Extract<PromptBufferItem, { kind: "text" }>, "kind" | "text">
+  | Pick<Extract<PromptBufferItem, { kind: "file" | "image" | "video" | "audio" }>, "kind" | "label">;
+
+export function buildPromptPreview(text: string, attachments: PromptPreviewItem[] = [], limit = 120): string | undefined {
+  const labels: Record<Exclude<PromptPreviewItem["kind"], "text">, string> = {
+    file: "文件",
+    image: "图片",
+    video: "视频",
+    audio: "音频"
+  };
+  const parts = [text, ...attachments.map((attachment) => attachment.kind === "text"
+    ? attachment.text
+    : `${labels[attachment.kind]}：${attachment.label}`
+  )];
+  const preview = parts.join(" ").replace(/\s+/g, " ").trim();
+  if (!preview) return undefined;
+  return preview.length > limit ? `${preview.slice(0, Math.max(1, limit - 1))}…` : preview;
+}
+
 export function parsePrompt(text: string): { text: string; attachments: PromptAttachment[] } {
   let normalized = text.trim();
   for (const instructions of [BRIDGE_ACTION_INSTRUCTIONS, LEGACY_BRIDGE_ACTION_INSTRUCTIONS]) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPrompt, parsePrompt, stripBridgeInstructions } from "../src/bridge/format.js";
+import { buildPrompt, buildPromptPreview, parsePrompt, stripBridgeInstructions } from "../src/bridge/format.js";
 
 test("prompt asks Codex to use native send actions for local media", () => {
   const prompt = buildPrompt("send me a random video from desktop");
@@ -49,4 +49,14 @@ test("parses Web attachment metadata out of displayed history", () => {
     }]
   });
   assert.equal(stripBridgeInstructions(prompt), "分析这份文件");
+});
+
+test("builds a bounded session preview without local attachment paths", () => {
+  assert.equal(buildPromptPreview("  分析   这份报告  ", [{
+    kind: "file",
+    label: "report.pdf"
+  }]), "分析 这份报告 文件：report.pdf");
+  assert.equal(buildPromptPreview("", [{ kind: "video", label: "demo.mp4" }]), "视频：demo.mp4");
+  assert.equal(buildPromptPreview("x".repeat(130))?.length, 120);
+  assert.equal(buildPromptPreview("x".repeat(130))?.endsWith("…"), true);
 });

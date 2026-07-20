@@ -231,6 +231,7 @@ test("reads managed thread history and continues the same session from Web", asy
   assert.equal(runs[0].threadId, undefined);
   assert.match(String(runs[0].prompt), /继续这个会话/);
   assert.equal(manager.listSessions()[0].threadId, "thread-web");
+  assert.equal(manager.listSessions()[0].lastPromptPreview, "继续这个会话");
   assert.deepEqual(await manager.getSessionMessages("account-one", session.id), [
     { id: "user-1", role: "user", text: "历史问题", attachments: [] },
     { id: "assistant-1", role: "assistant", text: "历史回答", attachments: [] }
@@ -280,6 +281,7 @@ test("stores Web uploads per session and exposes them in user history", async (t
     data: Buffer.from("report body")
   }]);
   assert.match(String(runs[0].prompt), /Web file: report_\.txt saved to/);
+  assert.equal(manager.listSessions()[0].lastPromptPreview, "分析附件 文件：report_.txt");
   history[0].text = String(runs[0].prompt);
 
   const messages = await manager.getSessionMessages("account-one", session.id);

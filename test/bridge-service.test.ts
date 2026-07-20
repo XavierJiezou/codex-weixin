@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { BridgeService } from "../src/bridge/service.js";
+import { buildPrompt } from "../src/bridge/format.js";
 import { defaultConfig, MAX_INBOUND_BYTES } from "../src/state/config.js";
 import { resolveStatePaths } from "../src/state/paths.js";
 import { RuntimeStateStore } from "../src/state/runtime-state.js";
@@ -368,6 +369,83 @@ test("replies directly when a WeChat attachment exceeds 100 MiB", async (t) => {
 
   assert.equal(runnerCalled, false);
   assert.deepEqual(replies, ["附件超过 100 MiB 上限，请压缩或裁剪后重新发送。"]);
+});
+
+test("lists resumable sessions with prompt previews and switches by number", async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-resume-"));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
+  const first = stateStore.createSession("alice@im.wechat", "/work/one", "更新修复");
+  stateStore.setThread("alice@im.wechat", "thread-one");
+  stateStore.setSessionPromptPreview(first.id, "修复 macOS 自动更新");
+  const second = stateStore.createSession("alice@im.wechat", "/work/two", "季度报告");
+  stateStore.setThread("alice@im.wechat", "thread-two");
+  const replies: string[] = [];
+  const runs: Array<{ prompt: string; threadId?: string }> = [];
+  const service = new BridgeService({
+    config: {
+      ...defaultConfig(tmpDir),
+      allowedSenderIds: ["alice@im.wechat"]
+    },
+    stateStore,
+    weixin: {
+      async sendTyping() {},
+      async sendText(input: { text: string }) {
+        replies.push(input.text);
+        return { messageId: `text-${replies.length}` };
+      }
+    } as never,
+    runner: {
+      async getHistory(threadId: string) {
+        assert.equal(threadId, "thread-two");
+        return [{
+          id: "history-user",
+          role: "user" as const,
+          text: buildPrompt("分析季度报告", [{
+            kind: "file",
+            label: "report.pdf",
+            path: "/private/report.pdf"
+          }])
+        }];
+      },
+      async run(input: { prompt: string; threadId?: string }) {
+        runs.push(input);
+        return { raw: "", text: "继续完成", threadId: input.threadId };
+      },
+      async stop() {}
+    } as never
+  });
+  const send = (id: string, text: string) => service.handleMessage({
+    id,
+    senderId: "alice@im.wechat",
+    contextToken: "ctx",
+    text,
+    raw: {}
+  });
+
+  await send("resume-list", "/resume");
+  const listReply = replies.at(-1) ?? "";
+  assert.match(listReply, /【当前】季度报告/);
+  assert.match(listReply, /最近内容：分析季度报告 文件：report\.pdf/);
+  assert.match(listReply, /更新修复/);
+  assert.match(listReply, /修复 macOS 自动更新/);
+  assert.doesNotMatch(listReply, /thread-one|thread-two|private\/report/);
+  assert.equal(stateStore.getSession(second.id)?.lastPromptPreview, "分析季度报告 文件：report.pdf");
+
+  await send("resume-invalid", "/resume 99");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.id, second.id);
+  assert.match(replies.at(-1) ?? "", /没有这个历史会话/);
+
+  const firstNumber = stateStore.listSessions()
+    .filter((session) => session.senderId === "alice@im.wechat")
+    .findIndex((session) => session.id === first.id) + 1;
+  await send("resume-first", `/resume ${firstNumber}`);
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.id, first.id);
+  assert.match(replies.at(-1) ?? "", /已切换到：更新修复/);
+  assert.doesNotMatch(replies.at(-1) ?? "", /thread-one/);
+
+  await send("continued-turn", "继续处理");
+  assert.equal(runs.at(-1)?.threadId, "thread-one");
 });
 
 test("lists and switches model and reasoning effort for the active WeChat session", async (t) => {

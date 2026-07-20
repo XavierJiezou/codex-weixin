@@ -10,6 +10,7 @@ export type ManagedSession = {
   title: string;
   workspace: string;
   threadId?: string;
+  lastPromptPreview?: string;
   model?: string;
   effort?: string;
   streamReplies?: boolean;
@@ -225,6 +226,15 @@ export class RuntimeStateStore {
     return structuredClone(session);
   }
 
+  setSessionPromptPreview(sessionId: string, preview: string): ManagedSession {
+    const session = this.mutableSession(sessionId);
+    const normalized = cleanPromptPreview(preview);
+    if (normalized) session.lastPromptPreview = normalized;
+    else delete session.lastPromptPreview;
+    this.save();
+    return structuredClone(session);
+  }
+
   renameSession(sessionId: string, title: string): ManagedSession {
     const session = this.mutableSession(sessionId);
     const nextTitle = cleanTitle(title);
@@ -333,5 +343,10 @@ function normalizeRuntimeState(value: Partial<RuntimeState>): RuntimeState {
 
 function cleanTitle(value?: string): string | undefined {
   const clean = value?.trim().replace(/\s+/g, " ").slice(0, 80);
+  return clean || undefined;
+}
+
+function cleanPromptPreview(value?: string): string | undefined {
+  const clean = value?.trim().replace(/\s+/g, " ").slice(0, 120);
   return clean || undefined;
 }

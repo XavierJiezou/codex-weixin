@@ -43,6 +43,17 @@ test("supports create, rename, switch, reset, and delete", (t) => {
   assert.equal(store.listSessions().length, 1);
 });
 
+test("persists a prompt preview without changing the session activity time", (t) => {
+  const store = createStore(t);
+  const session = store.createSession("alice@im.wechat", "/work/one", "历史会话");
+
+  store.setSessionPromptPreview(session.id, "  分析   项目方案  ");
+
+  const updated = store.getSession(session.id);
+  assert.equal(updated?.lastPromptPreview, "分析 项目方案");
+  assert.equal(updated?.updatedAt, session.updatedAt);
+});
+
 test("keeps sessions for different senders independent", (t) => {
   const store = createStore(t);
   const alice = store.createSession("alice@im.wechat", "/alice", "Alice");

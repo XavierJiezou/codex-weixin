@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { parseActionBlocks } from "../bridge/actions.js";
-import { buildPrompt, parsePrompt } from "../bridge/format.js";
+import { buildPrompt, buildPromptPreview, parsePrompt } from "../bridge/format.js";
 import type { PromptBufferItem } from "../bridge/prompt-buffer.js";
 import { BridgeService } from "../bridge/service.js";
 import { userFacingMessageHandlingError } from "../bridge/errors.js";
@@ -388,6 +388,10 @@ export class AccountManager {
     const session = requireSession(store, sessionId);
     const config = this.configProvider();
     const attachments = this.saveSessionUploads(accountId, session.id, uploads);
+    const promptPreview = buildPromptPreview(prompt, attachments);
+    if (promptPreview) {
+      store.setSessionPromptPreview(session.id, promptPreview);
+    }
     this.setSessionResponding(accountId, session.id, true);
     try {
       const result = await this.runnerFor(config).run({
