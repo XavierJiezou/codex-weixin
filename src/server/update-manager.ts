@@ -258,6 +258,7 @@ export function resolveNpmPath(options: {
     pathApi.join(nodeRoot, "lib", "node_modules", "npm", "bin", "npm-cli.js"),
     pathApi.join(installPrefix, "libexec", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
     pathApi.join(installPrefix, "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+    pathApi.join(pathApi.dirname(nodePath), "node_modules", "npm", "bin", "npm-cli.js"),
     ...executableNames.map((name) => pathApi.join(pathApi.dirname(nodePath), name)),
     ...executableNames.map((name) => pathApi.join(installPrefix, platform === "win32" ? "" : "bin", name)),
     ...(platform === "darwin" ? ["/opt/homebrew/bin/npm", "/usr/local/bin/npm"] : []),

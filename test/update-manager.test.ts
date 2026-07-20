@@ -231,6 +231,20 @@ test("finds Homebrew npm-cli outside a background service PATH", (t) => {
   }), fs.realpathSync.native(npmPath));
 });
 
+test("prefers the npm CLI bundled beside node.exe on Windows", {
+  skip: process.platform !== "win32"
+}, () => {
+  const npmCliPath = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+  assert.equal(fs.existsSync(npmCliPath), true);
+
+  assert.equal(resolveNpmPath({
+    installPrefix: os.tmpdir(),
+    platform: "win32",
+    env: { PATH: "" },
+    nodePath: process.execPath
+  }), fs.realpathSync.native(npmCliPath));
+});
+
 test("installs through an absolute npm CLI when PATH has no npm", async (t) => {
   const prefix = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-npm-install-"));
   t.after(() => fs.rmSync(prefix, { recursive: true, force: true }));

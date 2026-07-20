@@ -2,6 +2,12 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.8] - 2026-07-20
+
+### Fixed
+
+- Fixed Windows Web updates failing with exit code 1 when Node.js is installed under a path containing spaces such as `C:\Program Files\nodejs`; the updater now invokes the bundled `npm-cli.js` through Node instead of passing `npm.cmd` through `cmd.exe`.
+
 ## [0.3.7] - 2026-07-20
 
 ### Changed
