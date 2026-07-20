@@ -2,6 +2,13 @@
 
 All notable changes to `codex-weixin` are documented in this file.
 
+## [0.3.7] - 2026-07-20
+
+### Changed
+
+- Replaced numeric `/resume` selection with distinct `R1`, `R2`, and similar codes so a list position cannot be confused with default titles such as `会话 6`.
+- Rejected bare numeric selections with an explanatory reply, preventing users from accidentally switching to the wrong historical session.
+
 ## [0.3.6] - 2026-07-20
 
 ### Added
@@ -195,6 +202,7 @@ All notable changes to `codex-weixin` are documented in this file.
 - Kept GPT-5.6 options available after selecting a different model.
 - Removed extra message spacing and hid internal WeChat and Codex routing identifiers from the normal UI.
 
+[0.3.7]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.7
 [0.3.6]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.6
 [0.3.5]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.5
 [0.3.4]: https://github.com/XavierJiezou/codex-weixin/releases/tag/v0.3.4

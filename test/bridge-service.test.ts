@@ -371,7 +371,7 @@ test("replies directly when a WeChat attachment exceeds 100 MiB", async (t) => {
   assert.deepEqual(replies, ["附件超过 100 MiB 上限，请压缩或裁剪后重新发送。"]);
 });
 
-test("lists resumable sessions with prompt previews and switches by number", async (t) => {
+test("lists resumable sessions with unambiguous R codes and switches by code", async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-weixin-resume-"));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
   const stateStore = new RuntimeStateStore(resolveStatePaths(path.join(tmpDir, "state")));
@@ -423,25 +423,32 @@ test("lists resumable sessions with prompt previews and switches by number", asy
     raw: {}
   });
 
+  const listedSessions = stateStore.listSessions()
+    .filter((session) => session.senderId === "alice@im.wechat");
+  const firstNumber = listedSessions.findIndex((session) => session.id === first.id) + 1;
+  const secondNumber = listedSessions.findIndex((session) => session.id === second.id) + 1;
+
   await send("resume-list", "/resume");
   const listReply = replies.at(-1) ?? "";
-  assert.match(listReply, /【当前】季度报告/);
+  assert.match(listReply, new RegExp(`\\[R${secondNumber}\\] 【当前】季度报告`));
   assert.match(listReply, /最近内容：分析季度报告 文件：report\.pdf/);
-  assert.match(listReply, /更新修复/);
+  assert.match(listReply, new RegExp(`\\[R${firstNumber}\\] 更新修复`));
   assert.match(listReply, /修复 macOS 自动更新/);
+  assert.match(listReply, /R1 是切换编号，“会话 6”等是会话名称/);
   assert.doesNotMatch(listReply, /thread-one|thread-two|private\/report/);
   assert.equal(stateStore.getSession(second.id)?.lastPromptPreview, "分析季度报告 文件：report.pdf");
 
-  await send("resume-invalid", "/resume 99");
+  await send("resume-bare-number", "/resume 2");
   assert.equal(stateStore.getActiveSession("alice@im.wechat")?.id, second.id);
-  assert.match(replies.at(-1) ?? "", /没有这个历史会话/);
+  assert.match(replies.at(-1) ?? "", /R 开头的切换编号/);
 
-  const firstNumber = stateStore.listSessions()
-    .filter((session) => session.senderId === "alice@im.wechat")
-    .findIndex((session) => session.id === first.id) + 1;
-  await send("resume-first", `/resume ${firstNumber}`);
+  await send("resume-invalid", "/resume R99");
+  assert.equal(stateStore.getActiveSession("alice@im.wechat")?.id, second.id);
+  assert.match(replies.at(-1) ?? "", /没有这个切换编号/);
+
+  await send("resume-first", `/resume r${firstNumber}`);
   assert.equal(stateStore.getActiveSession("alice@im.wechat")?.id, first.id);
-  assert.match(replies.at(-1) ?? "", /已切换到：更新修复/);
+  assert.match(replies.at(-1) ?? "", new RegExp(`已通过 R${firstNumber} 切换到：更新修复`));
   assert.doesNotMatch(replies.at(-1) ?? "", /thread-one/);
 
   await send("continued-turn", "继续处理");

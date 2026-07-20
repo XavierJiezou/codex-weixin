@@ -142,29 +142,34 @@ export class BridgeService {
       const lines = ["历史会话（最近更新优先）："];
       for (const [index, session] of sessions.entries()) {
         lines.push(
-          `${index + 1}. ${session.id === activeId ? "【当前】" : ""}${session.title}`,
+          `[R${index + 1}] ${session.id === activeId ? "【当前】" : ""}${session.title}`,
           `   最近内容：${previews[index]}（${formatSessionTime(session.updatedAt)}）`
         );
       }
-      lines.push("", "发送 /resume <序号> 切换会话。");
+      lines.push("", "发送 /resume R1 这类切换编号继续会话；R1 是切换编号，“会话 6”等是会话名称。");
       for (const chunk of chunkText(lines.join("\n"))) {
         await this.reply(senderId, chunk);
       }
       return;
     }
-    if (!/^\d+$/.test(input)) {
-      await this.reply(senderId, "用法：/resume 或 /resume <序号>");
+    if (/^\d+$/.test(input)) {
+      await this.reply(senderId, "请使用列表中 R 开头的切换编号，例如 /resume R1；不要使用会话名称里的数字。");
       return;
     }
-    const selected = sessions[Number(input) - 1];
+    const match = /^r([1-9]\d*)$/i.exec(input);
+    if (!match) {
+      await this.reply(senderId, "用法：/resume 或 /resume R<编号>，例如 /resume R1。");
+      return;
+    }
+    const selected = sessions[Number(match[1]) - 1];
     if (!selected) {
-      await this.reply(senderId, "没有这个历史会话。发送 /resume 查看可用序号。");
+      await this.reply(senderId, "没有这个切换编号。发送 /resume 查看可用的 R 编号。");
       return;
     }
     const preview = await this.sessionPromptPreview(selected);
     this.options.stateStore.activateSession(selected.id);
     await this.reply(senderId, [
-      `已切换到：${selected.title}`,
+      `已通过 ${input.toUpperCase()} 切换到：${selected.title}`,
       `最近内容：${preview}`,
       selected.threadId ? "下一条消息将继续该历史会话。" : "该会话尚无历史内容，下一条消息将创建新上下文。"
     ].join("\n"));
@@ -535,7 +540,7 @@ function helpText(): string {
     "/status - show current binding",
     "/bind <absolute-path> - bind this chat to a workspace",
     "/new - create a new managed Codex session",
-    "/resume [number] - list or switch historical sessions",
+    "/resume [R-number] - list or switch historical sessions",
     "/model [number|model-id|default] - view or switch this session's model",
     "/effort [number|level|default] - view or switch reasoning effort",
     "/stream [on|off|default] - view or switch streaming replies",

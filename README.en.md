@@ -107,7 +107,7 @@ The UI uses local remarks instead of treating internal IDs as account names. Exp
 - Reset clears the recorded thread so the next message starts fresh context.
 - Delete removes only the bridge record, not Codex's own history files.
 - `/new` creates a new managed session for the current sender.
-- `/resume` lists this sender's sessions with recent prompt summaries and timestamps; `/resume <number>` switches back to the selected Codex thread.
+- `/resume` lists this sender's sessions with recent prompt summaries, timestamps, and distinct `R1`, `R2` selection codes; `/resume R1` switches back to the selected Codex thread without confusing the code with a title such as `Session 6`.
 
 ## WeChat commands
 
@@ -117,7 +117,7 @@ The UI uses local remarks instead of treating internal IDs as account names. Exp
 /bind <absolute-path>          Bind to an allowed workspace
 /new                          Create a new managed Codex session
 /resume                       List historical sessions with recent prompt summaries
-/resume <number>              Switch to and continue a historical session
+/resume R<number>             Continue a session by its distinct R selection code
 /model                        Show the current and available models
 /model <number|model|default>  Switch this session's model or restore inheritance
 /effort                       Show reasoning efforts supported by the current model
